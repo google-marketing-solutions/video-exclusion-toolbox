@@ -1,4 +1,4 @@
-# Youtube Ads Data Toolbox
+# Video Exclusion Toolbox
 
 By running ads on Youtube, an advertiser can only pull high level details of
 where their ads showed (name and URL). It's then hard to spot patterns of

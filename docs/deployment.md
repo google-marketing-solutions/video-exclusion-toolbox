@@ -1,6 +1,6 @@
-# YouTube Ads Toolbox Deployment
+# Video Exclusion Toolbox Deployment
 
-This doc provides information on how to deploy the YouTube Ads Toolbox solution.
+This doc provides information on how to deploy the Video Exclusion Toolbox solution.
 
 The deployment uses [Terraform](https://www.terraform.io/) to automate the
 deployment, and to keep all the Infrastructure as Code (IaC). The files can be

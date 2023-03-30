@@ -1,4 +1,4 @@
-# YouTube Ads Toolbox Architecture
+# Video Exclusion Toolbox Architecture
 
 ## Google Cloud Architecture
 
