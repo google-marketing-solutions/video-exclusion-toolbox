@@ -1,0 +1,122 @@
+[
+  {
+    "name": "datetime_updated",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "The datetime the data was pulled from YouTube"
+  },
+  {
+    "name": "customer_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The customer ID in Google Ads"
+  },
+  {
+    "name": "video_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The placement id (Video ID)"
+  },
+  {
+    "name": "youtube_video_name",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The placement display name in Google Ads"
+  },
+  {
+    "name": "youtube_video_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The URL of the placement"
+  },
+  {
+    "name": "placement_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The placement type"
+  },
+  {
+    "name": "youtube_channel_url",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The YouTube Channel ID"
+  },
+  {
+    "name": "impressions",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of impressions on the placement"
+  },
+  {
+    "name": "cost_micros",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The cost in micros"
+  },
+  {
+    "name": "conversions",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "The number of conversions"
+  },
+  {
+    "name": "video_view_rate",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "The video view rate"
+  },
+  {
+    "name": "video_views",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of video views"
+  },
+  {
+    "name": "clicks",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of clicks"
+  },
+  {
+    "name": "average_cpm",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "The average CPM"
+  },
+  {
+    "name": "ctr",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "The number of click through rate"
+  },
+  {
+    "name": "all_conversions_from_interactions_rate",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "The conversion rate"
+  },
+  {
+    "name": "video_quartile_p25_rate",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Percentage of impressions where the viewer watched 25% of your video. "
+  },
+  {
+    "name": "video_quartile_p50_rate",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Percentage of impressions where the viewer watched 50% of your video."
+  },
+  {
+    "name": "video_quartile_p75_rate",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Percentage of impressions where the viewer watched 75% of your video."
+  },
+  {
+    "name": "video_quartile_p100_rate",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Percentage of impressions where the viewer watched 100% of your video."
+  }
+]

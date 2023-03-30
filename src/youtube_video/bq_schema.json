@@ -1,0 +1,96 @@
+[
+  {
+    "name": "video_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The YouTube Video ID"
+  },
+  {
+    "name": "title",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The title of the YouTube video"
+  },
+  {
+    "name": "description",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The description of the YouTube Video"
+  },
+  {
+    "name": "publishedAt",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "The date when the video was published"
+  },
+  {
+    "name": "channelId",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The id of the YouTube channel where the video is uploaded"
+  },
+  {
+    "name": "categoryId",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The YouTube video category associated with the video."
+  },
+  {
+    "name": "tags",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "The YouTube video tags associated with the video."
+  },
+  {
+    "name": "defaultLanguage",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The language of the text in the video resource title and description properties."
+  },
+  {
+    "name": "duration",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The length of the video."
+  },  {
+    "name": "definition",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Indicates whether the video is available in high definition (HD) or only in standard definition."
+  },  
+  {
+    "name": "licensedContent",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE",
+    "description": "Indicates whether the video represents licensed content, which means that the content was uploaded to a channel linked to a YouTube content partner and then claimed by that partner."
+  },  
+  {
+    "name": "ytContentRating",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "A rating that YouTube uses to identify age-restricted content.    "
+  },  {
+    "name": "viewCount",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of times the video has been viewed.    "
+  },  
+  {
+    "name": "likeCount",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of users who have indicated that they liked the video.    "
+  },  
+  {
+    "name": "commentCount",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of comments for the video.    "
+  }, 
+  {
+    "name": "datetime_updated",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "The datetime the data was pulled from YouTube"
+  }
+]

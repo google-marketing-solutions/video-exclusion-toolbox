@@ -1,0 +1,32 @@
+[
+  {
+    "name": "id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The ID of the excluded asset (video or channel)"
+  },
+  {
+    "name": "exclusion_list",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The name of the exclusion list"
+  },
+  {
+    "name": "exclusion_type",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Type of the exclusion"
+  },
+  {
+    "name": "customer_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The customer ID in Google Ads"
+  },
+  {
+    "name": "datetime_updated",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "The datetime the data was pulled from Google Ads"
+  }
+]
