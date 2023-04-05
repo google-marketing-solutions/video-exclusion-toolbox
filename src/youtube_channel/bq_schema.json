@@ -1,0 +1,56 @@
+[
+  {
+    "name": "channel_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The YouTube Channel ID"
+  },
+  {
+    "name": "view_count",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of views the channel has"
+  },
+  {
+    "name": "video_count",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of videos the channel has uploaded to it"
+  },
+  {
+    "name": "subscriber_count",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The number of subscribers the channel has"
+  },
+  {
+    "name": "title",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The title of the YouTube channel"
+  },
+  {
+    "name": "country",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The country the channel is from"
+  },
+  {
+    "name": "topic_categories",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "A list of Wikipedia URLs that describe the channel's content."
+  },
+  {
+    "name": "clean_topics",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "A list of topics from topic_categories"
+  },
+  {
+    "name": "datetime_updated",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "The datetime the data was pulled from YouTube"
+  }
+]
