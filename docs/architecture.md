@@ -98,21 +98,22 @@ This service pulls the Exclusion List linked to your accounts to BigQuery. This 
 Combining the individual services, you can a high level architecture diagram
 below (to be redrawn):
 
-![Overall Architecture Diagram](./images/architecture-diagram1.png)
-![Overall Architecture Diagram](./images/architecture-diagram2.png)
+![Overall Architecture Diagram](./images/video-exclusion-toolbox.png)
 
 1. Cloud Scheduler triggers the Account Cloud Function.
-2. The function pulls the Google Ads customer IDs to run the code for, and the filters to apply to the Google Ads report.
-3. Each customer ID is pushed in a separate message to Pub/Sub.
-4. Pub/Sub triggers the Cloud Function.
-5. The Video report is downloaded from Google Ads.
-5. The Channel report is downloaded from Google Ads.
-6. The output is written as a CSV to Cloud Storage, with BigQuery in front.
-7. A message is passed to the next Pub/Sub topic.
-8. Pub/Sub triggers the Cloud Function.
-9. The function reads the channels that were pulled from Google Ads, and pulls their metadata from YouTube.
-9. The function reads the videos that were pulled from Google Ads, and pulls their metadata from YouTube.
-10. The output is written to BigQuery.
+1. The function pulls the Google Ads customer IDs to run the code for, and the filters to apply to the Google Ads report.
+1. Each customer ID is pushed in a separate message to Pub/Sub.
+1. Pub/Sub triggers the Cloud Functions.
+1. The Video report is downloaded from Google Ads.
+1. The Channel report is downloaded from Google Ads.
+1. The exclusion report is downloaded from Google Ads.
+1. The output is written as a CSV to Cloud Storage, with BigQuery in front.
+1. A message is passed to the next Pub/Sub topics.
+1. Pub/Sub triggers the Cloud Functions.
+1. The function reads the channels that were pulled from Google Ads, and pulls their metadata from YouTube.
+1. The function reads the videos that were pulled from Google Ads, and pulls their metadata from YouTube.
+1. The output is written to BigQuery.
+1. Views in BigQuery will join and aggregate the data from the tables. These can then be optionally used on the template Looker Studio Dashboard, provided as an example.
 
 ## How Do I use the data
 The data can be queried directly from BigQuery. We can add a view joining the Ads tables and the YouTube tables, then use a dashboarding tool like Looker Studio to analyse it and apply different filters to better understand where your ads are showing and how they are performing.

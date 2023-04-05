@@ -30,14 +30,14 @@ logger.setLevel(logging.INFO)
 # The Google Cloud project containing the pub/sub topic
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 # The name of the pub/sub topic
-YTAD_ADS_REPORT_VIDEO_PUBSUB_TOPIC = os.environ.get(
-    'YTAD_ADS_REPORT_VIDEO_PUBSUB_TOPIC'
+VID_EXCL_ADS_REPORT_VIDEO_PUBSUB_TOPIC = os.environ.get(
+    'VID_EXCL_ADS_REPORT_VIDEO_PUBSUB_TOPIC'
 )
-YTAD_ADS_REPORT_CHANNEL_PUBSUB_TOPIC = os.environ.get(
-    'YTAD_ADS_REPORT_CHANNEL_PUBSUB_TOPIC'
+VID_EXCL_ADS_REPORT_CHANNEL_PUBSUB_TOPIC = os.environ.get(
+    'VID_EXCL_ADS_REPORT_CHANNEL_PUBSUB_TOPIC'
 )
-YTAD_ADS_EXCLUSIONS_PUBSUB_TOPIC = os.environ.get(
-    'YTAD_ADS_EXCLUSIONS_PUBSUB_TOPIC'
+VID_EXCL_ADS_EXCLUSIONS_PUBSUB_TOPIC = os.environ.get(
+    'VID_EXCL_ADS_EXCLUSIONS_PUBSUB_TOPIC'
 )
 
 # The access scopes used in this function
@@ -141,7 +141,7 @@ def get_config_from_sheet(sheet_id: str) -> List[Dict[str, Any]]:
       sheet.values()
       .get(spreadsheetId=sheet_id, range='google_ads_lookback_days')
       .execute()
-      .get('values', [['30']])[0][0]
+      .get('values', [['1']])[0][0]
   )
 
   gads_filters_str = gads_filters_to_gaql_string(gads_filters)
@@ -197,17 +197,17 @@ def send_messages_to_pubsub(messages: List[Dict[str, Any]]) -> None:
   logger.info('Messages: %s', messages)
   pubsub.send_dicts_to_pubsub(
       messages=messages,
-      topic=YTAD_ADS_REPORT_VIDEO_PUBSUB_TOPIC,
+      topic=VID_EXCL_ADS_REPORT_VIDEO_PUBSUB_TOPIC,
       gcp_project=GOOGLE_CLOUD_PROJECT,
   )
   pubsub.send_dicts_to_pubsub(
       messages=messages,
-      topic=YTAD_ADS_REPORT_CHANNEL_PUBSUB_TOPIC,
+      topic=VID_EXCL_ADS_REPORT_CHANNEL_PUBSUB_TOPIC,
       gcp_project=GOOGLE_CLOUD_PROJECT,
   )
   pubsub.send_dicts_to_pubsub(
       messages=messages,
-      topic=YTAD_ADS_EXCLUSIONS_PUBSUB_TOPIC,
+      topic=VID_EXCL_ADS_EXCLUSIONS_PUBSUB_TOPIC,
       gcp_project=GOOGLE_CLOUD_PROJECT,
   )
   logger.info('All messages published')

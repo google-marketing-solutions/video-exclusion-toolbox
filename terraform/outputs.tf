@@ -12,6 +12,60 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-output "service_account_email" {
-  value = google_service_account.service_account.email
+output "A_service_account_email" {
+  value = <<-EOT
+
+
+
+      _________________________________Step_1___________________________________
+      ˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅
+      Grant Sheet access to the service account below:
+      
+      --------------------------------------------------------------------------
+      ${google_service_account.service_account.email}
+      --------------------------------------------------------------------------
+
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      ⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻
+    EOT
+}
+
+output "B_run_cloud_scheduler" {
+  value = <<-EOT
+
+
+
+      _____________________________Step_2_(optional)____________________________
+      ˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅
+
+      After populating the Google Sheet you can trigger the cloud functions
+      immediately by running the following command in the Cloud Shell:
+
+      --------------------------------------------------------------------------
+      gcloud scheduler jobs run video_exclusion_toolbox --location=${var.region} --project=${var.project_id}
+      --------------------------------------------------------------------------
+
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      ⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻
+    EOT
+}
+
+output "C_looker_studio_url" {
+  value = <<-EOT
+
+
+
+      _________________________________Step_3___________________________________
+      ˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅
+
+      Click on the link below to create a new Looker Studio Dashboard, then
+      follow the "Edit and Share" process:
+
+      --------------------------------------------------------------------------
+      https://lookerstudio.google.com/reporting/create?c.reportId=${var.looker_studio_template}&r.reportName=Video%20Exclusion%20Toolbox&ds.youtube_channel.datasourceName=YouTubeChannel&ds.youtube_channel.connector=bigQuery&ds.youtube_channel.type=TABLE&ds.youtube_channel.projectId=${var.project_id}&ds.youtube_channel.datasetId=${var.bq_dataset}&ds.youtube_channel.tableId=YouTubeChannel&ds.ads_and_channels.datasourceName=AdsAndChannels&ds.ads_and_channels.connector=bigQuery&ds.ads_and_channels.type=TABLE&ds.ads_and_channels.projectId=${var.project_id}&ds.ads_and_channels.datasetId=${var.bq_dataset}&ds.ads_and_channels.tableId=AdsAndYoutubeAndChannels&ds.ads_and_youtube.datasourceName=AdsAndYoutube&ds.ads_and_youtube.connector=bigQuery&ds.ads_and_youtube.type=TABLE&ds.ads_and_youtube.projectId=${var.project_id}&ds.ads_and_youtube.datasetId=${var.bq_dataset}&ds.ads_and_youtube.tableId=AdsAndYouTube
+      --------------------------------------------------------------------------
+
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      ⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻
+    EOT
 }

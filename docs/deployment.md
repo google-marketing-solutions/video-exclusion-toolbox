@@ -1,6 +1,6 @@
 # Video Exclusion Toolbox Deployment
 
-This doc provides information on how to deploy the Video Exclusion Toolbox solution.
+This doc provides information on how to deploy the Video Exclusion Toolbox.
 
 The deployment uses [Terraform](https://www.terraform.io/) to automate the
 deployment, and to keep all the Infrastructure as Code (IaC). The files can be
@@ -125,7 +125,7 @@ To test everything is working, configure the Google Sheet ([see below](#google-s
 ## Google Sheet
 
 Open your copy of the Google Sheet. This is what you'll be using to configure
-the YouTube Ads Toolbox solution.
+the Video Exclusion Toolbox solution.
 
 There are notes in the Sheet that contain instructions for how to set this up.
 

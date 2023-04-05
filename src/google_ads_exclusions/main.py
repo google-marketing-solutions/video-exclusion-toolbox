@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # The bucket to write the data to
-YTAD_GCS_DATA_BUCKET = os.environ.get('YTAD_GCS_DATA_BUCKET')
+VID_EXCL_GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
 
 # The schema of the JSON in the event payload
 message_schema = {
@@ -170,12 +170,12 @@ def write_results_to_gcs(filename: str, df: pd.DataFrame) -> None:
 
   if number_of_rows > 0:
     logger.info(
-        'Writing %d rows to GCS: {YTAD_GCS_DATA_BUCKET}/%s.',
+        'Writing %d rows to GCS: {VID_EXCL_GCS_DATA_BUCKET}/%s.',
         number_of_rows,
         filename,
     )
     gcs.upload_blob_from_df(
-        df=df, blob_name=filename, bucket=YTAD_GCS_DATA_BUCKET
+        df=df, blob_name=filename, bucket=VID_EXCL_GCS_DATA_BUCKET
     )
     logger.info('Blob uploaded to GCS')
   else:

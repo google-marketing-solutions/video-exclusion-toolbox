@@ -56,5 +56,11 @@ variable "config_sheet_id" {
 variable "bq_dataset" {
   type        = string
   description = "The name of the BQ dataset"
-  default     = "yt_ads_data"
+  default     = "video_exclusion_toolbox"
+}
+
+variable "looker_studio_template" {
+  type        = string
+  description = "The ID of the template Looker Studio dashboard"
+  default     = "2194043e-84bb-432b-b3e6-0553369745be" 
 }

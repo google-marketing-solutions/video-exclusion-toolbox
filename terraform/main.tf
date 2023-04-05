@@ -19,8 +19,8 @@ provider "google" {
 
 # SERVICE ACCOUNT --------------------------------------------------------------
 resource "google_service_account" "service_account" {
-  account_id   = "yt-ads-data-runner"
-  display_name = "Service Account for running Youtube Ads Data Toolbox"
+  account_id   = "video-exclusion-runner"
+  display_name = "Service Account for running the Video Exclusion Toolbox"
 }
 resource "google_project_iam_member" "cloud_functions_invoker_role" {
   project = var.project_id
@@ -49,8 +49,8 @@ resource "google_project_iam_member" "storage_object_admin_role" {
 }
 
 # CLOUD STORAGE ----------------------------------------------------------------
-resource "google_storage_bucket" "ytad_data_bucket" {
-  name                        = "${var.project_id}-ytad-data"
+resource "google_storage_bucket" "video_exclusion_data_bucket" {
+  name                        = "${var.project_id}-vid-excl-data"
   location                    = var.region
   force_destroy               = true
   uniform_bucket_level_access = true
@@ -71,6 +71,12 @@ resource "google_storage_bucket" "function_bucket" {
       type = "Delete"
     }
   }
+}
+resource "google_storage_bucket" "categories_lookup" {
+  name                        = "${var.project_id}-categories-lookup"
+  location                    = var.region
+  force_destroy               = true
+  uniform_bucket_level_access = true
 }
 
 # CLOUD FUNCTIONS --------------------------------------------------------------
@@ -152,10 +158,16 @@ resource "google_storage_bucket_object" "youtube_video" {
 #   source     = data.archive_file.google_ads_excluder_zip.output_path
 #   depends_on = [data.archive_file.google_ads_excluder_zip]
 # }
+resource "google_storage_bucket_object" "categories_lookup" {
+  name       = "categories_lookup.csv"
+  bucket     = google_storage_bucket.categories_lookup.name
+  source     = "../src/categories_lookup.csv"
+  content_type = "text/plain"
+}
 
 resource "google_cloudfunctions_function" "google_ads_accounts_function" {
   region                = var.region
-  name                  = "ytad-google_ads_accounts"
+  name                  = "vid-excl-google_ads_accounts"
   description           = "Identify which reports to run the Google Ads report for."
   runtime               = "python310"
   source_archive_bucket = google_storage_bucket.function_bucket.name
@@ -167,16 +179,16 @@ resource "google_cloudfunctions_function" "google_ads_accounts_function" {
   trigger_http          = true
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT                 = var.project_id
-    YTAD_ADS_REPORT_VIDEO_PUBSUB_TOPIC   = google_pubsub_topic.google_ads_report_video_pubsub_topic.name
-    YTAD_ADS_REPORT_CHANNEL_PUBSUB_TOPIC = google_pubsub_topic.google_ads_report_channel_pubsub_topic.name
-    YTAD_ADS_EXCLUSIONS_PUBSUB_TOPIC = google_pubsub_topic.google_ads_exclusions_pubsub_topic.name
+    GOOGLE_CLOUD_PROJECT                      = var.project_id
+    VID_EXCL_ADS_REPORT_VIDEO_PUBSUB_TOPIC    = google_pubsub_topic.google_ads_report_video_pubsub_topic.name
+    VID_EXCL_ADS_REPORT_CHANNEL_PUBSUB_TOPIC  = google_pubsub_topic.google_ads_report_channel_pubsub_topic.name
+    VID_EXCL_ADS_EXCLUSIONS_PUBSUB_TOPIC      = google_pubsub_topic.google_ads_exclusions_pubsub_topic.name
 
   }
 }
 resource "google_cloudfunctions_function" "google_ads_exclusions_function" {
   region                = var.region
-  name                  = "ytad-google_ads_exclusions"
+  name                  = "vid-excl-google_ads_exclusions"
   description           = "Retrieve all the excluded videos and channels for a given account and store them in BigQuery."
   runtime               = "python310"
   source_archive_bucket = google_storage_bucket.function_bucket.name
@@ -199,12 +211,12 @@ resource "google_cloudfunctions_function" "google_ads_exclusions_function" {
     GOOGLE_ADS_DEVELOPER_TOKEN      = var.google_ads_developer_token
     GOOGLE_ADS_LOGIN_CUSTOMER_ID    = var.google_ads_login_customer_id
     GOOGLE_CLOUD_PROJECT            = var.project_id
-    YTAD_GCS_DATA_BUCKET            = google_storage_bucket.ytad_data_bucket.name
+    VID_EXCL_GCS_DATA_BUCKET        = google_storage_bucket.video_exclusion_data_bucket.name
   }
 }
 resource "google_cloudfunctions_function" "google_ads_report_video_function" {
   region                = var.region
-  name                  = "ytad-google_ads_report_video"
+  name                  = "vid-excl-google_ads_report_video"
   description           = "Move the placement report from Google Ads to BigQuery."
   runtime               = "python310"
   source_archive_bucket = google_storage_bucket.function_bucket.name
@@ -220,20 +232,20 @@ resource "google_cloudfunctions_function" "google_ads_report_video_function" {
   }
 
   environment_variables = {
-    GOOGLE_ADS_USE_PROTO_PLUS       = false
-    GOOGLE_ADS_REFRESH_TOKEN        = var.oauth_refresh_token
-    GOOGLE_ADS_CLIENT_ID            = var.google_cloud_client_id
-    GOOGLE_ADS_CLIENT_SECRET        = var.google_cloud_client_secret
-    GOOGLE_ADS_DEVELOPER_TOKEN      = var.google_ads_developer_token
-    GOOGLE_ADS_LOGIN_CUSTOMER_ID    = var.google_ads_login_customer_id
-    GOOGLE_CLOUD_PROJECT            = var.project_id
-    YTAD_GCS_DATA_BUCKET            = google_storage_bucket.ytad_data_bucket.name
-    YTAD_YOUTUBE_VIDEO_PUBSUB_TOPIC = google_pubsub_topic.youtube_video_pubsub_topic.name
+    GOOGLE_ADS_USE_PROTO_PLUS           = false
+    GOOGLE_ADS_REFRESH_TOKEN            = var.oauth_refresh_token
+    GOOGLE_ADS_CLIENT_ID                = var.google_cloud_client_id
+    GOOGLE_ADS_CLIENT_SECRET            = var.google_cloud_client_secret
+    GOOGLE_ADS_DEVELOPER_TOKEN          = var.google_ads_developer_token
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID        = var.google_ads_login_customer_id
+    GOOGLE_CLOUD_PROJECT                = var.project_id
+    VID_EXCL_GCS_DATA_BUCKET            = google_storage_bucket.video_exclusion_data_bucket.name
+    VID_EXCL_YOUTUBE_VIDEO_PUBSUB_TOPIC = google_pubsub_topic.youtube_video_pubsub_topic.name
   }
 }
 resource "google_cloudfunctions_function" "google_ads_report_channel_function" {
   region                = var.region
-  name                  = "ytad-google_ads_report_channel"
+  name                  = "vid-excl-google_ads_report_channel"
   description           = "Move the channel placement report from Google Ads to BigQuery."
   runtime               = "python310"
   source_archive_bucket = google_storage_bucket.function_bucket.name
@@ -249,21 +261,21 @@ resource "google_cloudfunctions_function" "google_ads_report_channel_function" {
   }
 
   environment_variables = {
-    GOOGLE_ADS_USE_PROTO_PLUS         = false
-    GOOGLE_ADS_REFRESH_TOKEN          = var.oauth_refresh_token
-    GOOGLE_ADS_CLIENT_ID              = var.google_cloud_client_id
-    GOOGLE_ADS_CLIENT_SECRET          = var.google_cloud_client_secret
-    GOOGLE_ADS_DEVELOPER_TOKEN        = var.google_ads_developer_token
-    GOOGLE_ADS_LOGIN_CUSTOMER_ID      = var.google_ads_login_customer_id
-    GOOGLE_CLOUD_PROJECT              = var.project_id
-    YTAD_GCS_DATA_BUCKET              = google_storage_bucket.ytad_data_bucket.name
-    YTAD_YOUTUBE_CHANNEL_PUBSUB_TOPIC = google_pubsub_topic.youtube_channel_pubsub_topic.name
+    GOOGLE_ADS_USE_PROTO_PLUS            = false
+    GOOGLE_ADS_REFRESH_TOKEN              = var.oauth_refresh_token
+    GOOGLE_ADS_CLIENT_ID                  = var.google_cloud_client_id
+    GOOGLE_ADS_CLIENT_SECRET              = var.google_cloud_client_secret
+    GOOGLE_ADS_DEVELOPER_TOKEN            = var.google_ads_developer_token
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID          = var.google_ads_login_customer_id
+    GOOGLE_CLOUD_PROJECT                  = var.project_id
+    VID_EXCL_GCS_DATA_BUCKET              = google_storage_bucket.video_exclusion_data_bucket.name
+    VID_EXCL_YOUTUBE_CHANNEL_PUBSUB_TOPIC = google_pubsub_topic.youtube_channel_pubsub_topic.name
   }
 }
 
 resource "google_cloudfunctions_function" "youtube_channel_function" {
   region                = var.region
-  name                  = "ytad-youtube_channels"
+  name                  = "vid-excl-youtube_channels"
   description           = "Pull the channel data from the YouTube API."
   runtime               = "python310"
   source_archive_bucket = google_storage_bucket.function_bucket.name
@@ -279,16 +291,16 @@ resource "google_cloudfunctions_function" "youtube_channel_function" {
   }
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT           = var.project_id
-    YTAD_ADS_EXCLUDER_PUBSUB_TOPIC = google_pubsub_topic.google_ads_excluder_pubsub_topic.name
-    YTAD_BIGQUERY_DATASET          = google_bigquery_dataset.dataset.dataset_id
-    YTAD_GCS_DATA_BUCKET           = google_storage_bucket.ytad_data_bucket.name
+    GOOGLE_CLOUD_PROJECT                = var.project_id
+    VID_EXCL_ADS_EXCLUDER_PUBSUB_TOPIC  = google_pubsub_topic.google_ads_excluder_pubsub_topic.name
+    VID_EXCL_BIGQUERY_DATASET           = google_bigquery_dataset.dataset.dataset_id
+    VID_EXCL_GCS_DATA_BUCKET            = google_storage_bucket.video_exclusion_data_bucket.name
   }
 }
 
 resource "google_cloudfunctions_function" "youtube_video_function" {
   region                = var.region
-  name                  = "ytad-youtube_videos"
+  name                  = "vid-excl-youtube_videos"
   description           = "Pull the video data from the YouTube API."
   runtime               = "python310"
   source_archive_bucket = google_storage_bucket.function_bucket.name
@@ -304,17 +316,17 @@ resource "google_cloudfunctions_function" "youtube_video_function" {
   }
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT           = var.project_id
-    YTAD_ADS_EXCLUDER_PUBSUB_TOPIC = google_pubsub_topic.google_ads_excluder_pubsub_topic.name
-    YTAD_BIGQUERY_DATASET          = google_bigquery_dataset.dataset.dataset_id
-    YTAD_GCS_DATA_BUCKET           = google_storage_bucket.ytad_data_bucket.name
+    GOOGLE_CLOUD_PROJECT                = var.project_id
+    VID_EXCL_ADS_EXCLUDER_PUBSUB_TOPIC  = google_pubsub_topic.google_ads_excluder_pubsub_topic.name
+    VID_EXCL_BIGQUERY_DATASET           = google_bigquery_dataset.dataset.dataset_id
+    VID_EXCL_GCS_DATA_BUCKET            = google_storage_bucket.video_exclusion_data_bucket.name
   }
 }
 
 
 # resource "google_cloudfunctions_function" "google_ads_excluder_function" {
 #   region                = var.region
-#   name                  = "ytad-google_ads_excluder"
+#   name                  = "vid-excl-google_ads_excluder"
 #   description           = "Exclude the channels in Google Ads"
 #   runtime               = "python310"
 #   source_archive_bucket = google_storage_bucket.function_bucket.name
@@ -330,117 +342,41 @@ resource "google_cloudfunctions_function" "youtube_video_function" {
 #   }
 
 #   environment_variables = {
-#     GOOGLE_CLOUD_PROJECT         = var.project_id
-#     GOOGLE_ADS_USE_PROTO_PLUS    = false
-#     GOOGLE_ADS_REFRESH_TOKEN     = var.oauth_refresh_token
-#     GOOGLE_ADS_CLIENT_ID         = var.google_cloud_client_id
-#     GOOGLE_ADS_CLIENT_SECRET     = var.google_cloud_client_secret
-#     GOOGLE_ADS_DEVELOPER_TOKEN   = var.google_ads_developer_token
-#     GOOGLE_ADS_LOGIN_CUSTOMER_ID = var.google_ads_login_customer_id
-#     YTAD_BIGQUERY_DATASET         = google_bigquery_dataset.dataset.dataset_id
-#     YTAD_GCS_DATA_BUCKET          = google_storage_bucket.ytad_data_bucket.name
+#     GOOGLE_CLOUD_PROJECT              = var.project_id
+#     GOOGLE_ADS_USE_PROTO_PLUS         = false
+#     GOOGLE_ADS_REFRESH_TOKEN          = var.oauth_refresh_token
+#     GOOGLE_ADS_CLIENT_ID              = var.google_cloud_client_id
+#     GOOGLE_ADS_CLIENT_SECRET          = var.google_cloud_client_secret
+#     GOOGLE_ADS_DEVELOPER_TOKEN        = var.google_ads_developer_token
+#     GOOGLE_ADS_LOGIN_CUSTOMER_ID      = var.google_ads_login_customer_id
+#     VID_EXCL_BIGQUERY_DATASET         = google_bigquery_dataset.dataset.dataset_id
+#     VID_EXCL_GCS_DATA_BUCKET          = google_storage_bucket.video_exclusion_data_bucket.name
 #   }
 # }
 
-# BIGQUERY ---------------------------------------------------------------------
-resource "google_bigquery_dataset" "dataset" {
-  dataset_id                 = var.bq_dataset
-  location                   = var.region
-  description                = "Ads Placement Excluder BQ Dataset"
-  delete_contents_on_destroy = true
-}
-resource "google_bigquery_table" "google_ads_report_video_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
-  table_id            = "GoogleAdsReportVideo"
-  deletion_protection = false
-
-  external_data_configuration {
-    autodetect    = false
-    source_format = "CSV"
-    source_uris = [
-      "gs://${google_storage_bucket.ytad_data_bucket.name}/google_ads_report_video/*.csv"
-    ]
-    schema = file("../src/google_ads_report_video/bq_schema.json")
-    csv_options {
-      quote             = ""
-      skip_leading_rows = "1"
-    }
-  }
-}
-resource "google_bigquery_table" "google_ads_exclusions_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
-  table_id            = "GoogleAdsExclusions"
-  deletion_protection = false
-
-  external_data_configuration {
-    autodetect    = false
-    source_format = "CSV"
-    source_uris = [
-      "gs://${google_storage_bucket.ytad_data_bucket.name}/google_ads_exclusions/*.csv"
-    ]
-    schema = file("../src/google_ads_exclusions/bq_schema.json")
-    csv_options {
-      quote             = ""
-      skip_leading_rows = "1"
-    }
-  }
-}
-resource "google_bigquery_table" "google_ads_report_channel_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
-  table_id            = "GoogleAdsReportChannel"
-  deletion_protection = false
-
-  external_data_configuration {
-    autodetect    = false
-    source_format = "CSV"
-    source_uris = [
-      "gs://${google_storage_bucket.ytad_data_bucket.name}/google_ads_report_channel/*.csv"
-    ]
-    schema = file("../src/google_ads_report_channel/bq_schema.json")
-    csv_options {
-      quote             = ""
-      skip_leading_rows = "1"
-    }
-  }
-}
-
-resource "google_bigquery_table" "youtube_channel_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
-  table_id            = "YouTubeChannel"
-  deletion_protection = false
-  schema              = file("../src/youtube_channel/bq_schema.json")
-}
-
-resource "google_bigquery_table" "youtube_video_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
-  table_id            = "YouTubeVideo"
-  deletion_protection = false
-  schema              = file("../src/youtube_video/bq_schema.json")
-}
-
 # PUB/SUB ----------------------------------------------------------------------
 resource "google_pubsub_topic" "google_ads_report_video_pubsub_topic" {
-  name                       = "ytad-google-ads-report-video_topic"
+  name                       = "vid-excl-google-ads-report-video_topic"
   message_retention_duration = "604800s"
 }
 resource "google_pubsub_topic" "google_ads_exclusions_pubsub_topic" {
-  name                       = "ytad-google-ads-exclusions_topic"
+  name                       = "vid-excl-google-ads-exclusions_topic"
   message_retention_duration = "604800s"
 }
 resource "google_pubsub_topic" "google_ads_report_channel_pubsub_topic" {
-  name                       = "ytad-google-ads-report-channel_topic"
+  name                       = "vid-excl-google-ads-report-channel_topic"
   message_retention_duration = "604800s"
 }
 resource "google_pubsub_topic" "youtube_video_pubsub_topic" {
-  name                       = "ytad-youtube-video-topic"
+  name                       = "vid-excl-youtube-video-topic"
   message_retention_duration = "604800s"
 }
 resource "google_pubsub_topic" "youtube_channel_pubsub_topic" {
-  name                       = "ytad-youtube-channel-topic"
+  name                       = "vid-excl-youtube-channel-topic"
   message_retention_duration = "604800s"
 }
 resource "google_pubsub_topic" "google_ads_excluder_pubsub_topic" {
-  name                       = "ytad-google-ads-excluder-topic"
+  name                       = "vid-excl-google-ads-excluder-topic"
   message_retention_duration = "604800s"
 }
 
@@ -452,9 +388,9 @@ locals {
     }
     EOF
 }
-resource "google_cloud_scheduler_job" "ytad_scheduler" {
-  name             = "yt_ads_data_toolbox"
-  description      = "Run the YT Ads Data Toolbox pipeline"
+resource "google_cloud_scheduler_job" "video_exclusion_scheduler" {
+  name             = "video_exclusion_toolbox"
+  description      = "Run the Video Exclusion Toolbox pipeline"
   schedule         = "0 * * * *"
   time_zone        = "Etc/UTC"
   attempt_deadline = "320s"

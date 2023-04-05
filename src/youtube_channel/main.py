@@ -37,15 +37,15 @@ logger.setLevel(logging.INFO)
 # The Google Cloud project
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 # The bucket to write the data to
-YTAD_GCS_DATA_BUCKET = os.environ.get('YTAD_GCS_DATA_BUCKET')
+VID_EXCL_GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
 # The name of the BigQuery Dataset
-BQ_DATASET = os.environ.get('YTAD_BIGQUERY_DATASET')
+BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 
 # Optional variable to specify the problematic CSV characters. This is an env
 # variable, so if any other characters come up they can be replaced in the
 # Cloud Function UI without redeploying the solution.
-YTAD_CSV_PROBLEM_CHARACTERS_REGEX = os.environ.get(
-    'YTAD_CSV_PROBLEM_CHARACTERS', r'\$|\"|\'|\r|\n|\t|,|;|:'
+VID_EXCL_CSV_PROBLEM_CHARACTERS_REGEX = os.environ.get(
+    'VID_EXCL_CSV_PROBLEM_CHARACTERS', r'\$|\"|\'|\r|\n|\t|,|;|:'
 )
 
 # Maximum number of channels per YouTube request. See:
@@ -109,7 +109,7 @@ def run(customer_id: str, blob_name: str) -> None:
 
   # step 1: Pull list of YT channels IDs from the blob
   # Open blob and get specifc column
-  df = pd.read_csv(f'gs://{YTAD_GCS_DATA_BUCKET}/{blob_name}')
+  df = pd.read_csv(f'gs://{VID_EXCL_GCS_DATA_BUCKET}/{blob_name}')
   channel_ids = list(df['channel_id'])
   # for channel_ids not in BQ, run the following
   logger.info('Checking new channels')
@@ -215,7 +215,7 @@ def sanitise_youtube_dataframe(youtube_df: pd.DataFrame) -> pd.DataFrame:
   # remove problematic characters from the title field as the break BigQuery
   # even when escaped in the CSV
   youtube_df['title'] = youtube_df['title'].str.replace(
-      YTAD_CSV_PROBLEM_CHARACTERS_REGEX, '', regex=True
+      VID_EXCL_CSV_PROBLEM_CHARACTERS_REGEX, '', regex=True
   )
   youtube_df['title'] = youtube_df['title'].str.strip()
   return youtube_df
