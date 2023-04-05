@@ -52,7 +52,7 @@ https://www.googleapis.com/auth/adwords
 These changes need to be done once manually, as they are not controlled by Terraform:
 
 1. If you want to use the sample Looker Studio dashboard to display the data, 
-   request access to the [this dashboard](https://lookerstudio.google.com/c/reporting/2194043e-84bb-432b-b3e6-0553369745be). The deployment process will prompt you to create a copy of it later on. Once you've been granted access, proceed with the next step. This is optional and you can create your own dashboards to connect to the BigQuery datasets.
+   request access to [this dashboard](https://lookerstudio.google.com/c/reporting/2194043e-84bb-432b-b3e6-0553369745be). The deployment process will prompt you to create a copy of it later on. Once you've been granted access, proceed with the next step. This is optional and you can create your own dashboards to connect to the BigQuery datasets.
 1. Open the Google Cloud Project in the UI.
 1. Go to [Cloud Storage](https://console.cloud.google.com/storage/browser) and
    create a new bucket, which will be used to keep track of the Terraform state,
