@@ -205,8 +205,12 @@ def get_report_query(
   logger.info('Getting report query')
   date_from, date_to = get_query_dates(lookback_days)
   where_query = ''
+  if lookback_days > 1:
+    where_query = f'AND segments.date BETWEEN "{date_from}" AND "{date_to}"'
+  else:
+    where_query = f'AND segments.date = "{date_to}"'
   if gads_filters is not None:
-    where_query = f'AND {gads_filters}'
+    where_query += f' AND {gads_filters}'
   query = f"""
         SELECT
             customer.id,
@@ -232,7 +236,6 @@ def get_report_query(
             detail_placement_view
         WHERE detail_placement_view.placement_type = "YOUTUBE_VIDEO"
             AND campaign.advertising_channel_type = "VIDEO"
-            AND segments.date BETWEEN "{date_from}" AND "{date_to}"
             AND detail_placement_view.display_name != ""
             {where_query}
     """
@@ -283,7 +286,6 @@ def write_results_to_gcs(
       The name of the newly created blob.
   """
   date_from, date_to = get_query_dates(lookback_days)
-
   logger.info('Writing results to GCS: %s', VID_EXCL_GCS_DATA_BUCKET)
   number_of_rows = len(report_df.index)
   logger.info('There are %s rows', number_of_rows)
@@ -293,7 +295,7 @@ def write_results_to_gcs(
           f'google_ads_report_video/{customer_id}_{date_from}_{date_to}.csv'
       )
     else:
-      blob_name = f'google_ads_report_video/{customer_id}_{date_from}.csv'
+      blob_name = f'google_ads_report_video/{customer_id}_{date_to}.csv'
     logger.info('Blob name: %s', blob_name)
     gcs.upload_blob_from_df(
         df=report_df, blob_name=blob_name, bucket=VID_EXCL_GCS_DATA_BUCKET

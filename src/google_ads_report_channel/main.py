@@ -100,7 +100,7 @@ def start_job(
   """
   logger.info('Starting job to fetch data for %s', customer_id)
   report_df = get_report_df_channels(customer_id, lookback_days, gads_filters)
-  blob_name = write_results_to_gcs(report_df, customer_id)
+  blob_name = write_results_to_gcs(report_df, lookback_days, customer_id)
   if blob_name:
     send_messages_to_pubsub(customer_id, blob_name)
   else:
@@ -124,7 +124,7 @@ def get_report_df_channels(
   """
   logger.info('Getting report stream for %s', customer_id)
   now = datetime.datetime.now()
-  client = GoogleAdsClient.load_from_env(version='v11')
+  client = GoogleAdsClient.load_from_env(version='v13')
   ga_service = client.get_service('GoogleAdsService')
 
   query = get_report_query(lookback_days, gads_filters)
@@ -191,8 +191,12 @@ def get_report_query(
   logger.info('Getting chnanel report query')
   date_from, date_to = get_query_dates(lookback_days)
   where_query = ''
+  if lookback_days > 1:
+    where_query = f'AND segments.date BETWEEN "{date_from}" AND "{date_to}"'
+  else:
+    where_query = f'AND segments.date = "{date_to}"'
   if gads_filters is not None:
-    where_query = f'AND {gads_filters}'
+    where_query += f' AND {gads_filters}'
   query = f"""
         SELECT
             customer.id,
@@ -211,7 +215,6 @@ def get_report_query(
             group_placement_view
         WHERE group_placement_view.placement_type = "YOUTUBE_CHANNEL"
             AND campaign.advertising_channel_type = "VIDEO"
-            AND segments.date BETWEEN "{date_from}" AND "{date_to}"
             AND group_placement_view.display_name != ""
             AND group_placement_view.target_url != ""
             {where_query}
@@ -248,22 +251,31 @@ def get_query_dates(
   )
 
 
-def write_results_to_gcs(report_df: pd.DataFrame, customer_id: str) -> str:
+def write_results_to_gcs(
+    report_df: pd.DataFrame, lookback_days: int, customer_id: str
+) -> str:
   """Writes the report dataframe to GCS as a CSV file.
 
   Args:
       report_df: The dataframe based on the Google Ads report.
+      lookback_days: The number of days from today to look back when the report
+        was fetched.
       customer_id: The customer ID to fetch the Google Ads data for.
 
   Returns:
-      The blob_name written to or an empty string.
+      The name of the newly created blob.
   """
-  today = datetime.datetime.today().strftime('%Y-%m-%d')
+  date_from, date_to = get_query_dates(lookback_days)
   logger.info('Writing results to GCS: %s', VID_EXCL_GCS_DATA_BUCKET)
   number_of_rows = len(report_df.index)
   logger.info('There are %s rows', number_of_rows)
   if number_of_rows > 0:
-    blob_name = f'google_ads_report_channel/{customer_id}_{today}.csv'
+    if lookback_days > 1:
+      blob_name = (
+          f'google_ads_report_channel/{customer_id}_{date_from}_{date_to}.csv'
+      )
+    else:
+      blob_name = f'google_ads_report_channel/{customer_id}_{date_to}.csv'
     logger.info('Blob name: %s', blob_name)
     gcs.upload_blob_from_df(
         df=report_df, blob_name=blob_name, bucket=VID_EXCL_GCS_DATA_BUCKET
