@@ -1,0 +1,80 @@
+[
+  {
+    "name": "video_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The YouTube Video ID."
+  },
+  {
+    "name": "thumbnail_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The URL of the thumbnail."
+  },
+  {
+      "name": "label",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "The label of the detected object."
+  },
+  {
+      "name": "confidence",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The confidence of the detected object."
+  },
+  {
+      "name": "coord_1_x",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The x coordinate of the upper left corner of the object."
+  },
+  {
+      "name": "coord_1_y",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The y coordinate of the upper left corner of the object."
+  },
+  {
+      "name": "coord_2_x",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The x coordinate of the upper right corner of the object."
+  },
+  {
+      "name": "coord_2_y",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The x coordinate of the upper right corner of the object."
+  },
+  {
+      "name": "coord_3_x",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The x coordinate of the lower right corner of the object."
+  },
+  {
+      "name": "coord_3_y",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The y coordinate of the lower right corner of the object."
+  },
+  {
+      "name": "coord_4_x",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The x coordinate of the lower left corner of the object."
+  },
+  {
+      "name": "coord_4_y",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The y coordinate of the lower left corner of the object."
+  },
+  {
+    "name": "datetime_updated",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "The datetime when the thumbnail was analyzed by Vision API."
+  }
+]
