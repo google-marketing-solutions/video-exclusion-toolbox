@@ -24,52 +24,28 @@
       "description": "The confidence of the detected object."
   },
   {
-      "name": "coord_1_x",
+      "name": "top_left_x",
       "type": "FLOAT",
       "mode": "NULLABLE",
       "description": "The x coordinate of the upper left corner of the object."
   },
   {
-      "name": "coord_1_y",
+      "name": "top_left_y",
       "type": "FLOAT",
       "mode": "NULLABLE",
       "description": "The y coordinate of the upper left corner of the object."
   },
   {
-      "name": "coord_2_x",
+      "name": "bottom_right_x",
       "type": "FLOAT",
       "mode": "NULLABLE",
       "description": "The x coordinate of the upper right corner of the object."
   },
   {
-      "name": "coord_2_y",
+      "name": "bottom_right_y",
       "type": "FLOAT",
       "mode": "NULLABLE",
       "description": "The x coordinate of the upper right corner of the object."
-  },
-  {
-      "name": "coord_3_x",
-      "type": "FLOAT",
-      "mode": "NULLABLE",
-      "description": "The x coordinate of the lower right corner of the object."
-  },
-  {
-      "name": "coord_3_y",
-      "type": "FLOAT",
-      "mode": "NULLABLE",
-      "description": "The y coordinate of the lower right corner of the object."
-  },
-  {
-      "name": "coord_4_x",
-      "type": "FLOAT",
-      "mode": "NULLABLE",
-      "description": "The x coordinate of the lower left corner of the object."
-  },
-  {
-      "name": "coord_4_y",
-      "type": "FLOAT",
-      "mode": "NULLABLE",
-      "description": "The y coordinate of the lower left corner of the object."
   },
   {
     "name": "datetime_updated",

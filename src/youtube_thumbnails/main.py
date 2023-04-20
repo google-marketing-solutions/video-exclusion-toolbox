@@ -15,17 +15,22 @@
 """Pull YouTube video data for the placements in the Google Ads report."""
 import base64
 import datetime
+import io
 import json
 import logging
 import os
 import sys
 from typing import Any, Dict
+import uuid
 
 import google.auth
 import google.auth.credentials
+from google.cloud import storage
 from google.cloud import vision
+from google.cloud.storage.blob import Blob
 import jsonschema
 import pandas as pd
+import PIL.Image
 import requests
 from utils import bq
 
@@ -33,8 +38,13 @@ logging.basicConfig(stream=sys.stdout)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+CROP_AND_STORE_OBJECTS = True
+OBJECTS_TO_CROP_AND_STORE = ['Person']
+
 # The name of the BigQuery Dataset
 BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
+# The bucket to write the data to
+THUMBNAIL_CROP_BUCKET = os.environ.get('THUMBNAIL_CROP_BUCKET')
 
 THUMBNAIL_URL = 'https://i.ytimg.com/vi/{video_id}/{thumbnail_name}.jpg'
 
@@ -123,12 +133,99 @@ def run(video_id: str) -> None:
 
   all_thumbnails = pd.concat(all_thumbnails, axis=0, ignore_index=True)
 
-  print(all_thumbnails)
   write_results_to_bq(
       all_thumbnails, BQ_DATASET + '.YouTubeThumbnailsWithAnnotations'
   )
 
-  logger.info('Done')
+  if CROP_AND_STORE_OBJECTS:
+    objects_to_check = all_thumbnails[
+        all_thumbnails['label'].isin(OBJECTS_TO_CROP_AND_STORE)
+    ]
+
+    object_urls = []
+    for _, row in objects_to_check.iterrows():
+      cropped_image = _get_image_cropout(
+          url=row['thumbnail_url'],
+          top_left_x=row['top_left_x'],
+          top_left_y=row['top_left_y'],
+          bottom_right_x=row['bottom_right_x'],
+          bottom_right_y=row['bottom_right_y'],
+      )
+      blob = _save_image_to_gcs(
+          client=storage.Client(),
+          image=cropped_image,
+          image_name=(
+              f'{row["video_id"]}/{row["label"]}-{str(uuid.uuid4())[-6:]}.png'
+          ),
+          bucket_name=THUMBNAIL_CROP_BUCKET,
+      )
+      object_urls.append(blob.public_url)
+    # TODO(jakubmedved) send the urls to a pubsub for further processing
+
+
+def _save_image_to_gcs(
+    client: storage.Client, image: PIL.Image, image_name: str, bucket_name: str
+) -> Blob:
+  """Uploads an image object to a GCS bucket.
+
+  Args:
+    client: An initialized GCS client
+    image: Image object
+    image_name: Name of the object to be created as
+    bucket_name: Name oth the GCS bucket for the object to be created in
+
+  Returns:
+    Url of the newly created GCS object
+  """
+
+  bucket = client.bucket(bucket_name)
+  img_byte_array = io.BytesIO()
+  image.save(img_byte_array, format='JPEG')
+  image_blob = bucket.blob(image_name)
+  image_blob.upload_from_string(
+      img_byte_array.getvalue(), content_type='image/jpeg'
+  )
+  return image_blob
+
+
+def _get_image_cropout(
+    url: str,
+    top_left_x,
+    top_left_y,
+    bottom_right_x,
+    bottom_right_y,
+) -> PIL.Image:
+  """Crops an image based on the given relative coordinates and uploads the resulting crop-out to a cloud bucket.
+
+  Args:
+      url (str): The URL of the image to crop.
+      top_left_x (int): The x-coordinate of the top-left corner of the crop
+        rectangle, as a percentage of the width of the image.
+      top_left_y (int): The y-coordinate of the top-left corner of the crop
+        rectangle, as a percentage of the height of the image.
+      bottom_right_x (int): The x-coordinate of the bottom-right corner of the
+        crop rectangle, as a percentage of the width of the image.
+      bottom_right_y (int): The y-coordinate of the bottom-right corner of the
+        crop rectangle, as a percentage of the height of the image.
+
+  Returns:
+      PIL.Image: The cropped image.
+  """
+
+  image = PIL.Image.open(requests.get(url, stream=True).raw)
+  width = image.width
+  height = image.height
+
+  top_left_x = top_left_x * width
+  top_left_y = top_left_y * height
+  bottom_right_x = bottom_right_x * width
+  bottom_right_y = bottom_right_y * height
+
+  cropped_image = image.crop(
+      (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
+  )
+
+  return cropped_image
 
 
 def get_auth_credentials() -> google.auth.credentials.Credentials:
@@ -182,15 +279,11 @@ def _parse_vision_object_annotations(
 
   return {
       'label': vision_object.name,
-      'confidence': float(vision_object.score),
-      'coord_1_x': float(vision_object.bounding_poly.normalized_vertices[0].x),
-      'coord_1_y': float(vision_object.bounding_poly.normalized_vertices[0].y),
-      'coord_2_x': float(vision_object.bounding_poly.normalized_vertices[1].x),
-      'coord_2_y': float(vision_object.bounding_poly.normalized_vertices[1].y),
-      'coord_3_x': float(vision_object.bounding_poly.normalized_vertices[2].x),
-      'coord_3_y': float(vision_object.bounding_poly.normalized_vertices[2].y),
-      'coord_4_x': float(vision_object.bounding_poly.normalized_vertices[3].x),
-      'coord_4_y': float(vision_object.bounding_poly.normalized_vertices[3].y),
+      'confidence': vision_object.score,
+      'top_left_x': vision_object.bounding_poly.normalized_vertices[0].x,
+      'top_left_y': vision_object.bounding_poly.normalized_vertices[0].y,
+      'bottom_right_x': vision_object.bounding_poly.normalized_vertices[2].x,
+      'bottom_right_y': vision_object.bounding_poly.normalized_vertices[2].y,
   }
 
 

@@ -45,21 +45,13 @@ def load_to_bq_from_df(
           bigquery.SchemaField(
               "confidence", bigquery.enums.SqlTypeNames.FLOAT),
           bigquery.SchemaField(
-              "coord_1_x", bigquery.enums.SqlTypeNames.FLOAT),
+              "top_left_x", bigquery.enums.SqlTypeNames.FLOAT),
           bigquery.SchemaField(
-              "coord_1_y", bigquery.enums.SqlTypeNames.FLOAT),
+              "top_left_y", bigquery.enums.SqlTypeNames.FLOAT),
           bigquery.SchemaField(
-              "coord_2_x", bigquery.enums.SqlTypeNames.FLOAT),
+              "bottom_right_x", bigquery.enums.SqlTypeNames.FLOAT),
           bigquery.SchemaField(
-              "coord_2_y", bigquery.enums.SqlTypeNames.FLOAT),
-          bigquery.SchemaField(
-              "coord_3_x", bigquery.enums.SqlTypeNames.FLOAT),
-          bigquery.SchemaField(
-              "coord_3_y", bigquery.enums.SqlTypeNames.FLOAT),
-          bigquery.SchemaField(
-              "coord_4_x", bigquery.enums.SqlTypeNames.FLOAT),
-          bigquery.SchemaField(
-              "coord_4_y", bigquery.enums.SqlTypeNames.FLOAT),
+              "bottom_right_y", bigquery.enums.SqlTypeNames.FLOAT),
           bigquery.SchemaField(
               "datetime_updated",
               bigquery.enums.SqlTypeNames.TIMESTAMP,
