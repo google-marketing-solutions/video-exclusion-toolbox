@@ -62,5 +62,11 @@ variable "bq_dataset" {
 variable "looker_studio_template" {
   type        = string
   description = "The ID of the template Looker Studio dashboard"
-  default     = "2194043e-84bb-432b-b3e6-0553369745be" 
+  default     = "2194043e-84bb-432b-b3e6-0553369745be"
+}
+
+variable "push_cropout_notifications_to_pubsub" {
+  type        = bool
+  description = "Send a notification to pubsub for a cropped thumbnail image."
+  default     = false
 }

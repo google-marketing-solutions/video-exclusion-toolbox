@@ -27,24 +27,36 @@ import google.auth
 import google.auth.credentials
 from google.cloud import storage
 from google.cloud import vision
-from google.cloud.storage.blob import Blob
+from google.cloud.storage import blob
 import jsonschema
 import pandas as pd
 import PIL.Image
 import requests
 from utils import bq
+from utils import pubsub
+
 
 logging.basicConfig(stream=sys.stdout)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# Governs whether object crop-outs will be genearted for the thumbnail.
 CROP_AND_STORE_OBJECTS = True
-OBJECTS_TO_CROP_AND_STORE = ['Person']
+# Selector of what labels of objects will be cropped out.
+# For age recognition, 'Face' is recommended.
+OBJECTS_TO_CROP_AND_STORE = ['Face', 'Person']
 
-# The name of the BigQuery Dataset
+# The Google Cloud project containing the pub/sub topic
+GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
+# The name of the BigQuery Dataset.
 BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
-# The bucket to write the data to
-THUMBNAIL_CROP_BUCKET = os.environ.get('THUMBNAIL_CROP_BUCKET')
+# The bucket to write the data to.
+THUMBNAIL_CROP_BUCKET = os.environ.get('VID_EXCL_THUMBNAIL_CROP_BUCKET')
+# Governs whether a message with fie addess is generated once a crop-out
+# image is produced.
+SEND_CROPOUTS_TO_PUBSUB = os.environ.get('SEND_CROPOUTS_TO_PUBSUB')
+# The topic to send the messages with cropped images po further process.
+CROPPED_IMAGES_PUBSUB_TOPIC = os.environ.get('CROPPED_IMAGES_PUBSUB_TOPIC')
 
 THUMBNAIL_URL = 'https://i.ytimg.com/vi/{video_id}/{thumbnail_name}.jpg'
 
@@ -61,7 +73,7 @@ THUMBNAIL_SET_1 = ['sd1', 'hq1', 'mq1', '1']
 THUMBNAIL_SET_2 = ['sd2', 'hq2', 'mq2', '2']
 THUMBNAIL_SET_3 = ['sd3', 'hq3', 'mq3', '3']
 
-# The schema of the JSON in the event payload
+# The schema of the JSON in the event payload.
 message_schema = {
     'type': 'object',
     'properties': {
@@ -110,72 +122,121 @@ def run(video_id: str) -> None:
   """
 
   logger.info('Looking up thumbnails for video %s', video_id)
-  thumbnail_default = _get_best_resolution(THUMBNAIL_SET_DEFAULT, video_id)
-  thumbnail_1 = _get_best_resolution(THUMBNAIL_SET_1, video_id)
-  thumbnail_2 = _get_best_resolution(THUMBNAIL_SET_2, video_id)
-  thumbnail_3 = _get_best_resolution(THUMBNAIL_SET_3, video_id)
+  thumbnails = [
+      _get_best_resolution_thumbnail(THUMBNAIL_SET_DEFAULT, video_id),
+      _get_best_resolution_thumbnail(THUMBNAIL_SET_1, video_id),
+      _get_best_resolution_thumbnail(THUMBNAIL_SET_2, video_id),
+      _get_best_resolution_thumbnail(THUMBNAIL_SET_3, video_id),
+  ]
 
-  all_thumbnails = []
-  if thumbnail_default:
-    logger.info('Analyzing objects in %s', thumbnail_default)
-    all_thumbnails.append(
-        _get_vision_api_labels_to_df(thumbnail_default, video_id)
+  for thumbnail in thumbnails:
+    _process_thumbnail(
+        thumbnail=thumbnail,
+        video_id=video_id,
+        generate_cropouts=CROP_AND_STORE_OBJECTS,
+        cropout_object_list=OBJECTS_TO_CROP_AND_STORE,
     )
-  if thumbnail_1:
-    logger.info('Analyzing objects in %s', thumbnail_1)
-    all_thumbnails.append(_get_vision_api_labels_to_df(thumbnail_1, video_id))
-  if thumbnail_2:
-    logger.info('Analyzing objects in %s', thumbnail_2)
-    all_thumbnails.append(_get_vision_api_labels_to_df(thumbnail_2, video_id))
-  if thumbnail_3:
-    logger.info('Analyzing objects in %s', thumbnail_3)
-    all_thumbnails.append(_get_vision_api_labels_to_df(thumbnail_3, video_id))
 
-  all_thumbnails = pd.concat(all_thumbnails, axis=0, ignore_index=True)
 
-  write_results_to_bq(
-      all_thumbnails, BQ_DATASET + '.YouTubeThumbnailsWithAnnotations'
-  )
+def _process_thumbnail(
+    thumbnail: dict[PIL.Image.Image | str] | None,
+    video_id: str,
+    generate_cropouts: bool,
+    cropout_object_list: list[str],
+) -> None:
+  """Orchestrate the full processing pipeline for a single thumbnail.
 
-  if CROP_AND_STORE_OBJECTS:
-    objects_to_check = all_thumbnails[
-        all_thumbnails['label'].isin(OBJECTS_TO_CROP_AND_STORE)
-    ]
+  Args:
+    thumbnail: The dictionary containing the image object and its url.
+    video_id: The YouTube video ID .
+    generate_cropouts: The switch to control whether identified object should be
+      cropped out.
+    cropout_object_list: The list of object labels to be cropped out, e.g.
+      ['Person', 'Car', 'Face']. Only used if generate_cropouts == True.
+  """
+  if thumbnail is not None:
+    logger.info('Processing thumbnail: %s', thumbnail['url'])
 
-    object_urls = []
-    for _, row in objects_to_check.iterrows():
-      cropped_image = _get_image_cropout(
-          url=row['thumbnail_url'],
-          top_left_x=row['top_left_x'],
-          top_left_y=row['top_left_y'],
-          bottom_right_x=row['bottom_right_x'],
-          bottom_right_y=row['bottom_right_y'],
-      )
-      blob = _save_image_to_gcs(
-          client=storage.Client(),
-          image=cropped_image,
-          image_name=(
-              f'{row["video_id"]}/{row["label"]}-{str(uuid.uuid4())[-6:]}.png'
-          ),
-          bucket_name=THUMBNAIL_CROP_BUCKET,
-      )
-      object_urls.append(blob.public_url)
-    # TODO(jakubmedved) send the urls to a pubsub for further processing
+    objects = _localized_object_annotations_from_image(thumbnail['image'])
+    objects.extend(_face_annotations_from_image(thumbnail['image']))
+
+    objects = pd.DataFrame(objects)
+
+    objects.insert(0, 'thumbnail_url', thumbnail['url'])
+    objects.insert(0, 'video_id', video_id)
+    objects['datetime_updated'] = datetime.datetime.now()
+
+    write_results_to_bq(
+        objects, BQ_DATASET + '.YouTubeThumbnailsWithAnnotations'
+    )
+
+    if generate_cropouts and cropout_object_list:
+      objects_to_check = objects[
+          objects['label'].isin(cropout_object_list)
+      ]
+
+      for _, row in objects_to_check.iterrows():
+        cropped_image = _cropout_from_image(
+            image=thumbnail['image'],
+            top_left_x=row['top_left_x'],
+            top_left_y=row['top_left_y'],
+            bottom_right_x=row['bottom_right_x'],
+            bottom_right_y=row['bottom_right_y'],
+        )
+
+        image_blob = _save_image_to_gcs(
+            client=storage.Client(),
+            image=cropped_image,
+            image_name=_generate_thumbnail_name(
+                video_id=video_id,
+                video_url=thumbnail['url'],
+                label=row['label'],
+            ),
+            bucket_name=THUMBNAIL_CROP_BUCKET,
+        )
+
+        if SEND_CROPOUTS_TO_PUBSUB:
+          pubsub.send_message_to_pubsub(
+              message=image_blob.public_url,
+              topic=CROPPED_IMAGES_PUBSUB_TOPIC,
+              gcp_project=GOOGLE_CLOUD_PROJECT,
+          )
+
+
+def _generate_thumbnail_name(video_id: str, video_url: str, label: str) -> str:
+  """Generates a sinitized file name for a GCS blob.
+
+  Args:
+    video_id: YouTube video ID, acts as a GCP folder.
+    video_url: YouTube Video url.
+    label: Object label.
+
+  Returns:
+    New object name for GCS in format:
+    {video_id}/{label}-{random-UUID}-{sanitized video_id}.
+  """
+  sanitized_url = video_url
+  for ch in [':', '/', '.', '?', '#', '&', '=', '+']:
+    sanitized_url = sanitized_url.replace(ch, '_')
+  # The "_" is for conciseness and readability purposes only, there's no
+  # technical requirement, and so a simplictic replacement is sufficient.
+  sanitized_url = sanitized_url.replace('___', '_').replace('__', '_')
+  return f'{video_id}/{label}-{str(uuid.uuid4())[-6:]}-{sanitized_url}.png'
 
 
 def _save_image_to_gcs(
     client: storage.Client, image: PIL.Image, image_name: str, bucket_name: str
-) -> Blob:
+) -> blob.Blob:
   """Uploads an image object to a GCS bucket.
 
   Args:
-    client: An initialized GCS client
-    image: Image object
-    image_name: Name of the object to be created as
-    bucket_name: Name oth the GCS bucket for the object to be created in
+    client: An initialized GCS client.
+    image: Image object.
+    image_name: Name of the object to be created as.
+    bucket_name: Name oth the GCS bucket for the object to be created in.
 
   Returns:
-    Url of the newly created GCS object
+    Url of the newly created GCS object.
   """
 
   bucket = client.bucket(bucket_name)
@@ -188,17 +249,17 @@ def _save_image_to_gcs(
   return image_blob
 
 
-def _get_image_cropout(
-    url: str,
+def _cropout_from_image(
+    image: PIL.Image.Image,
     top_left_x,
     top_left_y,
     bottom_right_x,
     bottom_right_y,
-) -> PIL.Image:
-  """Crops an image based on the given relative coordinates and uploads the resulting crop-out to a cloud bucket.
+) -> PIL.Image.Image:
+  """Crop an image based on relative coordinates coordinates.
 
   Args:
-      url (str): The URL of the image to crop.
+      image: The original image to crop a cuatout from.
       top_left_x (int): The x-coordinate of the top-left corner of the crop
         rectangle, as a percentage of the width of the image.
       top_left_y (int): The y-coordinate of the top-left corner of the crop
@@ -209,10 +270,9 @@ def _get_image_cropout(
         crop rectangle, as a percentage of the height of the image.
 
   Returns:
-      PIL.Image: The cropped image.
+      Image: The cropped image.
   """
 
-  image = PIL.Image.open(requests.get(url, stream=True).raw)
   width = image.width
   height = image.height
 
@@ -221,11 +281,9 @@ def _get_image_cropout(
   bottom_right_x = bottom_right_x * width
   bottom_right_y = bottom_right_y * height
 
-  cropped_image = image.crop(
+  return image.crop(
       (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
   )
-
-  return cropped_image
 
 
 def get_auth_credentials() -> google.auth.credentials.Credentials:
@@ -234,35 +292,71 @@ def get_auth_credentials() -> google.auth.credentials.Credentials:
   return credentials
 
 
-def _get_vision_api_labels_to_df(image_url: str, video_id: str) -> pd.DataFrame:
-  """Get labels from the Google Vision API for an image at the given URL.
+def _localized_object_annotations_from_image(
+    image: PIL.Image.Image,
+) -> list[dict[str]]:
+  """Get labels from the Google Vision API for an image object.
 
   Args:
-      image_url: The URL of the image.
-      video_id: The ID of the YouTube video.
+      image: The image object to retrieve localized object annotations for.
 
   Returns:
-      DataFrame: A DataFrame with object names, confidence scores and
-        coordinates.
+      list: A list of dictionaries containing localized annotations for each
+        identified object.
   """
+  logger.info('Getting localized object annotations.')
 
   client = vision.ImageAnnotatorClient()
 
-  image = vision.Image()
-  image.source.image_uri = image_url
-
-  objects = client.object_localization(image=image).localized_object_annotations
+  buffer = io.BytesIO()
+  image.save(buffer, format='PNG')
+  vision_image = vision.Image(content=buffer.getvalue())
+  objects = client.object_localization(
+      image=vision_image
+  ).localized_object_annotations
 
   logger.info('Number of objects found: %s', len(objects))
-  parsed_objects = []
-  for object_ in objects:
-    parsed_objects.append(_parse_vision_object_annotations(object_))
 
-  parsed_objects_df = pd.DataFrame(parsed_objects)
-  parsed_objects_df.insert(0, 'thumbnail_url', image_url)
-  parsed_objects_df.insert(0, 'video_id', video_id)
-  parsed_objects_df['datetime_updated'] = datetime.datetime.now()
-  return parsed_objects_df
+  return [_parse_vision_object_annotations(object_) for object_ in objects]
+
+
+def _face_annotations_from_image(image: PIL.Image.Image) -> list[dict[str]]:
+  """Get labels from the Google Vision API for an image object.
+
+  Args:
+      image: The image object to retrieve faces for.
+
+  Returns:
+      list: A list of dictionaries containing annotations for each
+        identified face.
+  """
+  logger.info('Getting faces.')
+
+  client = vision.ImageAnnotatorClient()
+
+  buffer = io.BytesIO()
+  image.save(buffer, format='PNG')
+  vision_image = vision.Image(content=buffer.getvalue())
+  faces = client.face_detection(image=vision_image).face_annotations
+
+  logger.info('Number of faces found: %s', len(faces))
+
+  width, height = image.size
+  parsed_annotations = [_parse_face_annotations(face) for face in faces]
+
+  # Face annotation coordinates are in absolute dimensions, this has to be
+  # converted to relative coordinates.
+  for parsed_annotation in parsed_annotations:
+    parsed_annotation['top_left_x'] = parsed_annotation['top_left_x'] / width
+    parsed_annotation['top_left_y'] = parsed_annotation['top_left_y'] / height
+    parsed_annotation['bottom_right_x'] = (
+        parsed_annotation['bottom_right_x'] / width
+    )
+    parsed_annotation['bottom_right_y'] = (
+        parsed_annotation['bottom_right_y'] / height
+    )
+
+  return parsed_annotations
 
 
 def _parse_vision_object_annotations(
@@ -276,7 +370,6 @@ def _parse_vision_object_annotations(
   Returns:
       dict: A dictionary of the parsed object values.
   """
-
   return {
       'label': vision_object.name,
       'confidence': vision_object.score,
@@ -287,28 +380,55 @@ def _parse_vision_object_annotations(
   }
 
 
-def _get_best_resolution(names: list[str], video_id: str) -> str | None:
-  """Writes the YouTube dataframe to BQ.
+def _parse_face_annotations(vision_object: vision.FaceAnnotation) -> dict[str]:
+  """Get labels from the Google Vision API for an image at the given URL.
 
   Args:
-      names: The an ordered list of thumbnail filenames to check.
+      vision_object: An object from the Vision API.
+        (https://cloud.google.com/python/docs/reference/vision/latest/google.cloud.vision_v1.types.FaceAnnotation)
+
+  Returns:
+      dict: A dictionary of the parsed object values.
+  """
+  return {
+      'label': 'Face',
+      'confidence': vision_object.detection_confidence,
+      'top_left_x': vision_object.bounding_poly.vertices[0].x,
+      'top_left_y': vision_object.bounding_poly.vertices[0].y,
+      'bottom_right_x': vision_object.bounding_poly.vertices[2].x,
+      'bottom_right_y': vision_object.bounding_poly.vertices[2].y,
+  }
+
+
+def _get_best_resolution_thumbnail(
+    file_names: list[str], video_id: str
+) -> dict[str | PIL.Image.Image] | None:
+  """Write the YouTube dataframe to BQ.
+
+  Args:
+      file_names: The an ordered list of thumbnail filenames to check.
       video_id: The id of YouTube video.
 
   Returns:
-      The url with the best resolution tumbnail available.
+      A dictionary with an Image object and url of the thumbnail.
   """
+  logger.info('Getting the best resolution for %s', file_names)
 
-  for name in names:
-    url = THUMBNAIL_URL.format(video_id=video_id, thumbnail_name=name)
-    if requests.get(url) == 200:
-      return url
+  for file_name in file_names:
+    url = THUMBNAIL_URL.format(video_id=video_id, thumbnail_name=file_name)
+
+    response = requests.get(url, stream=True)
+    if requests.get(url).status_code == 200:
+      logger.info('Best resolution was found at %s', url)
+      return {'image': PIL.Image.open(response.raw), 'url': url}
+  logger.info('Did not find a usable thumbnail for video %s', video_id)
   return None
 
 
 def write_results_to_bq(
     youtube_df: pd.DataFrame, table_id: str
 ) -> None:
-  """Writes the YouTube dataframe to BQ.
+  """Write the YouTube dataframe to BQ.
 
   Args:
       youtube_df: The dataframe based on the YouTube data.
