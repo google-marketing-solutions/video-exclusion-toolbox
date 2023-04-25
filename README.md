@@ -1,8 +1,8 @@
 # Video Exclusion Toolbox
 
 By running ads on Youtube, an advertiser can only pull high level details of
-where their ads showed (name and URL). It's then hard to spot patterns of
-unwanted channels/videos and decide what to exclude.
+where their ads showed (name and URL). It might be difficult hard to spot
+patterns of unwanted channels/videos and decide what to exclude.
 
 The Video Exclusion Toolbox pulls your ads reports from your selected accounts
 and enhances it with Youtube Data. This allows you to filter your data based
