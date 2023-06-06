@@ -4,9 +4,10 @@ By running ads on Youtube, an advertiser can only pull high level details of
 where their ads showed (name and URL). It's then hard to spot patterns of
 unwanted channels/videos and decide what to exclude.
 
-The Video Exclusion Toolbox pulls your ads reports from your selected accounts
-and enhances it with Youtube Data. This allows you to filter your data based
-on additional criteria and helps you exclude unwanted videos/channels.
+The [Video Exclusion Toolbox](https://github.com/google/video-exclusion-toolbox)
+pulls your ads reports from your selected accounts and enhances it with Youtube
+Data. This allows you to filter your data based on additional criteria and helps
+you exclude unwanted videos/channels.
 
 If your use case is to automatically exclude spam channels, please refer to the
 [Ads Placement Excluder](https://github.com/google/ads-placement-excluder)
