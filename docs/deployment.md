@@ -65,7 +65,7 @@ These changes need to be done once manually, as they are not controlled by Terra
    OAuth Client ID -> Web app -> Set
    `https://developers.google.com/oauthplayground` as an authorised redirect
    URI. Make a note of the `client_id` and the `client_secret`.
-1. Open the [OAuth playground](https://developers.google.com/oauthplayground/#step1&scopes=https%3A//www.googleapis.com/auth/spreadsheets.readonly%20https%3A//www.googleapis.com/auth/cloud-platform%20https%3A//www.googleapis.com/auth/youtue%20https%3A//www.googleapis.com/auth/adwords&useDefaultOauthCred=checked),
+1. Open the [OAuth playground](https://developers.google.com/oauthplayground/#step1&scopes=https%3A//www.googleapis.com/auth/spreadsheets.readonly%20https%3A//www.googleapis.com/auth/cloud-platform%20https%3A//www.googleapis.com/auth/youtube%20https%3A//www.googleapis.com/auth/adwords&useDefaultOauthCred=checked),
    and generate a refresh token for the [above scopes](#oauth), using the
    `client_id` and `client_secret` generated in the previous step
 1. Open Cloud Shell:
