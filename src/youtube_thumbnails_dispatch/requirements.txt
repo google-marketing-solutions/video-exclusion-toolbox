@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-google-auth==1.35.0
+fsspec==2023.9.0
+gcsfs==2023.9.0
+google-auth==2.22.0
 google-auth-httplib2==0.1.0
-google-auth-oauthlib==0.5.2
-google-cloud-bigquery==3.3.2
-google-cloud-vision==3.4.1
-jsonschema==4.9.1
-pandas==1.4.3
-requests==2.28.2
-Pillow==9.5.0
+google-auth-oauthlib==1.0.0
+google-cloud-bigquery==3.5.0
+google-cloud-pubsub==2.18.3
+jsonschema==4.19.0
+pandas==2.1.0
+pyarrow==13.0.0
