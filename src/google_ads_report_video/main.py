@@ -124,7 +124,7 @@ def get_report_df(
   """
   logger.info('Getting report stream for %s', customer_id)
   now = datetime.datetime.now()
-  client = GoogleAdsClient.load_from_env(version='v11')
+  client = GoogleAdsClient.load_from_env(version='v14')
   ga_service = client.get_service('GoogleAdsService')
 
   query = get_report_query(lookback_days, gads_filters)
