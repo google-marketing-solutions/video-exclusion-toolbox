@@ -65,8 +65,8 @@ variable "looker_studio_template" {
   default     = "2194043e-84bb-432b-b3e6-0553369745be"
 }
 
-variable "push_cropout_notifications_to_pubsub" {
+variable "crop_and_store_objects" {
   type        = bool
-  description = "Send a notification to pubsub for a cropped thumbnail image."
-  default     = false
+  description = "Switch whether to process the objects detected in a thumbnail."
+  default     = true
 }

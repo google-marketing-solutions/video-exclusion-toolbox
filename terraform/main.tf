@@ -17,6 +17,9 @@ provider "google" {
   region  = var.region
 }
 
+data "google_project" "project" {
+}
+
 # SERVICE ACCOUNT --------------------------------------------------------------
 resource "google_service_account" "service_account" {
   account_id   = "video-exclusion-runner"
@@ -47,6 +50,11 @@ resource "google_project_iam_member" "storage_object_admin_role" {
   role    = "roles/storage.objectAdmin"
   member  = "serviceAccount:${google_service_account.service_account.email}"
 }
+resource "google_project_iam_member" "secret_accessor_role" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.service_account.email}"
+}
 
 # CLOUD_SCHEDULER --------------------------------------------------------------
 locals {
@@ -56,6 +64,7 @@ locals {
     }
     EOF
 }
+
 resource "google_cloud_scheduler_job" "video_exclusion_scheduler" {
   name             = "video_exclusion_toolbox"
   description      = "Run the Video Exclusion Toolbox pipeline"

@@ -120,7 +120,7 @@ resource "google_bigquery_table" "youtube_thubmnails_table" {
   table_id            = "YouTubeThumbnailsWithAnnotations"
   deletion_protection = false
   depends_on = [google_bigquery_dataset.dataset]
-  schema              = file("../src/youtube_thubmnails/bq_schema.json")
+  schema              = file("../src/youtube_thumbnails_process/bq_schema.json")
 }
 
 # VIEWS ------------------------------------------------------------------------
