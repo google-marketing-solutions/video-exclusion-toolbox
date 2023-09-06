@@ -18,7 +18,7 @@ import sys
 from typing import Any, List, Dict
 import flask
 import google.auth
-from googleapiclient.discovery import build
+from googleapiclient import discovery
 import jsonschema
 from utils import pubsub
 
@@ -29,16 +29,10 @@ logger.setLevel(logging.INFO)
 
 # The Google Cloud project containing the pub/sub topic
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
-# The name of the pub/sub topic
-VID_EXCL_ADS_REPORT_VIDEO_PUBSUB_TOPIC = os.environ.get(
-    'VID_EXCL_ADS_REPORT_VIDEO_PUBSUB_TOPIC'
+ACCOUNT_PUBSUB_TOPIC = os.environ.get(
+    'VID_EXCL_ADS_ACCOUNT_PUBSUB_TOPIC'
 )
-VID_EXCL_ADS_REPORT_CHANNEL_PUBSUB_TOPIC = os.environ.get(
-    'VID_EXCL_ADS_REPORT_CHANNEL_PUBSUB_TOPIC'
-)
-VID_EXCL_ADS_EXCLUSIONS_PUBSUB_TOPIC = os.environ.get(
-    'VID_EXCL_ADS_EXCLUSIONS_PUBSUB_TOPIC'
-)
+
 
 # The access scopes used in this function
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
@@ -122,7 +116,7 @@ def get_config_from_sheet(sheet_id: str) -> List[Dict[str, Any]]:
   """
   logger.info('Getting config from sheet: %s', sheet_id)
   credentials, _ = google.auth.default(scopes=SCOPES)
-  sheets_service = build('sheets', 'v4', credentials=credentials)
+  sheets_service = discovery.build('sheets', 'v4', credentials=credentials)
   sheet = sheets_service.spreadsheets()
 
   customer_ids = (
@@ -197,17 +191,7 @@ def send_messages_to_pubsub(messages: List[Dict[str, Any]]) -> None:
   logger.info('Messages: %s', messages)
   pubsub.send_dicts_to_pubsub(
       messages=messages,
-      topic=VID_EXCL_ADS_REPORT_VIDEO_PUBSUB_TOPIC,
-      gcp_project=GOOGLE_CLOUD_PROJECT,
-  )
-  pubsub.send_dicts_to_pubsub(
-      messages=messages,
-      topic=VID_EXCL_ADS_REPORT_CHANNEL_PUBSUB_TOPIC,
-      gcp_project=GOOGLE_CLOUD_PROJECT,
-  )
-  pubsub.send_dicts_to_pubsub(
-      messages=messages,
-      topic=VID_EXCL_ADS_EXCLUSIONS_PUBSUB_TOPIC,
+      topic=ACCOUNT_PUBSUB_TOPIC,
       gcp_project=GOOGLE_CLOUD_PROJECT,
   )
   logger.info('All messages published')
