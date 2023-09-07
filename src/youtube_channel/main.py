@@ -339,8 +339,8 @@ def process_youtube_response(
     data.append([
         channel.get('id'),
         channel.get('statistics').get('viewCount', None),
-        channel.get('statistics').get('subscriberCount', None),
         channel.get('statistics').get('videoCount', None),
+        channel.get('statistics').get('subscriberCount', None),
         channel.get('snippet').get('title', ''),
         channel.get('snippet').get('country', ''),
         topic_categories,
