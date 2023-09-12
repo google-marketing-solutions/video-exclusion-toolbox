@@ -56,7 +56,9 @@ CROP_AND_STORE_OBJECTS = os.environ.get(
     'VID_EXCL_CROP_AND_STORE_OBJECTS', 'False'
 ).lower() in ('true', '1', 't')
 
-THUMBNAIL_URL = 'https://i.ytimg.com/vi/{video_id}/{thumbnail_name}.jpg'
+THUMBNAIL_URL_TEMPLATE = (
+    'https://i.ytimg.com/vi/{video_id}/{thumbnail_name}.jpg'
+)
 CHARS_TO_REPLACE_IN_IMAGE_NAME = [':', '/', '.', '?', '#', '&', '=', '+']
 IMAGE_FEATURE_TYPES = [
     {'type_': vision.Feature.Type.FACE_DETECTION},
@@ -64,18 +66,20 @@ IMAGE_FEATURE_TYPES = [
     {'type_': vision.Feature.Type.LABEL_DETECTION},
 ]
 
-THUMBNAIL_SET_DEFAULT = [
-    'maxresdefault',
-    'hq720',
-    'sddefault',
-    'hqdefault',
-    '0',
-    'mqdefault',
-    'default',
+THUMBNAIL_RESOLUTIONS = [
+    [
+        'maxresdefault',
+        'hq720',
+        'sddefault',
+        'hqdefault',
+        '0',
+        'mqdefault',
+        'default',
+    ],
+    ['sd1', 'hq1', 'mq1', '1'],
+    ['sd2', 'hq2', 'mq2', '2'],
+    ['sd3', 'hq3', 'mq3', '3'],
 ]
-THUMBNAIL_SET_1 = ['sd1', 'hq1', 'mq1', '1']
-THUMBNAIL_SET_2 = ['sd2', 'hq2', 'mq2', '2']
-THUMBNAIL_SET_3 = ['sd3', 'hq3', 'mq3', '3']
 
 # The schema of the JSON in the event payload.
 MESSAGE_SCHEMA = {
@@ -154,16 +158,10 @@ def _process_video(video_id: str) -> None:
       video_id: The YouTube Video ID to process.
   """
   logger.info('Looking up thumbnails for video %s', video_id)
-  thumbnails = (
-      _get_best_resolution_thumbnail(THUMBNAIL_SET_DEFAULT, video_id)
-      | _get_best_resolution_thumbnail(THUMBNAIL_SET_1, video_id)
-      | _get_best_resolution_thumbnail(THUMBNAIL_SET_2, video_id)
-      | _get_best_resolution_thumbnail(THUMBNAIL_SET_3, video_id)
-  )
+  thumbnails = _get_best_resolution_thumbnails(video_id=video_id)
 
   extracted_data = []
-
-  for url in list(thumbnails.keys()):
+  for url in thumbnails:
     logger.info('Processing thumbnail %s.', url)
     thumbnail_data = _extract_features_df_from_image_uri(image_uri=url)
     thumbnail_data.insert(0, 'thumbnail_url', url)
@@ -171,7 +169,10 @@ def _process_video(video_id: str) -> None:
     extracted_data.append(thumbnail_data)
 
   if not extracted_data:
-    logger.info('No usable thubmnails found for video %s.', video_id)
+    logger.info(
+        'No usable thubmnails found for video %s. No features extracted.',
+        video_id,
+    )
     return
 
   extracted_data = pd.concat(extracted_data, ignore_index=True)
@@ -198,10 +199,10 @@ def _process_video(video_id: str) -> None:
     )
 
     cropouts = {}
-    for thumbnail_url in thumbnails.keys():
+    for url in thumbnails:
       cropouts = cropouts | _generate_cropouts_from_image(
-          thumbnails[thumbnail_url],
-          filtered_objects[filtered_objects['thumbnail_url'] == thumbnail_url],
+          thumbnails[url],
+          filtered_objects[filtered_objects['thumbnail_url'] == url],
       )
 
     client = storage.Client()
@@ -218,13 +219,43 @@ def _process_video(video_id: str) -> None:
     )
 
 
+def _extract_features_df_from_image_uri(image_uri: str) -> pd.DataFrame:
+  """Extract features from a single thumbnail url.
+
+  Args:
+    image_uri: The location of the thumbnail.
+
+  Returns:
+    A dataframe of all the features detected in the thumbnail.
+  """
+  client = vision.ImageAnnotatorClient()
+  image = vision.Image()
+  image.source.image_uri = image_uri
+  features = IMAGE_FEATURE_TYPES
+  request = vision.AnnotateImageRequest(image=image, features=features)
+  response = client.annotate_image(request=request)
+
+  faces = [_parse_face_annotations(face) for face in response.face_annotations]
+
+  objects = [
+      _parse_vision_object_annotations(object_annotation)
+      for object_annotation in response.localized_object_annotations
+  ]
+
+  labels = [
+      _parse_label_annotations(label) for label in response.label_annotations
+  ]
+
+  return pd.DataFrame(faces + objects + labels)
+
+
 def _generate_cropouts_from_image(
     thumbnail: PIL.Image.Image, cropout_data: pd.DataFrame
 ) -> dict[PIL.Image.Image | None]:
   """Generate cropouts from an image.
 
   Args:
-    thumbnail: An image from which to crop out images.
+    thumbnail: An image from which to crop out features.
     cropout_data: A dataframe with coordinates of each cropout.
 
   Returns:
@@ -260,36 +291,6 @@ def _generate_cropouts_from_image(
   return cropped_images
 
 
-def _extract_features_df_from_image_uri(image_uri: str) -> pd.DataFrame:
-  """Extract features from a single thumbnail url.
-
-  Args:
-    image_uri: The location of the thumbnail.
-
-  Returns:
-    A dataframe of all the features detected in the thumbnail.
-  """
-  client = vision.ImageAnnotatorClient()
-  image = vision.Image()
-  image.source.image_uri = image_uri
-  features = IMAGE_FEATURE_TYPES
-  request = vision.AnnotateImageRequest(image=image, features=features)
-  response = client.annotate_image(request=request)
-
-  faces = [_parse_face_annotations(face) for face in response.face_annotations]
-
-  objects = [
-      _parse_vision_object_annotations(object_annotation)
-      for object_annotation in response.localized_object_annotations
-  ]
-
-  labels = [
-      _parse_label_annotations(label) for label in response.label_annotations
-  ]
-
-  return pd.DataFrame(faces + objects + labels)
-
-
 def _generate_thumbnail_name(video_id: str, video_url: str, label: str) -> str:
   """Generate a sanitized file name for a GCS blob.
 
@@ -322,8 +323,6 @@ def _save_image_to_gcs(
     image_name: Name of the object to be created as.
     bucket_name: Name oth the GCS bucket for the object to be created in.
 
-  Returns:
-    Url of the newly created GCS object.
   """
   bucket = client.bucket(bucket_name)
   img_byte_array = io.BytesIO()
@@ -397,7 +396,7 @@ def _parse_vision_object_annotations(
       (https://cloud.google.com/python/docs/reference/vision/latest/google.cloud.vision_v1.types.LocalizedObjectAnnotation)
 
   Returns:
-      dict: Parsed object annotations.
+      Parsed object annotations.
   """
   return {
       'label': vision_object.name,
@@ -441,7 +440,7 @@ def _parse_label_annotations(
         (https://cloud.google.com/python/docs/reference/vision/latest/google.cloud.vision_v1.types.EntityAnnotation)
 
   Returns:
-      dict: Parsed label annotations.
+      Parsed label annotations.
   """
   return {
       'label': vision_object.description,
@@ -454,30 +453,35 @@ def _parse_label_annotations(
   }
 
 
-def _get_best_resolution_thumbnail(
-    file_names: list[str], video_id: str
-) -> dict[PIL.Image.Image|None]:
-  """Write the YouTube dataframe to BQ.
+def _get_best_resolution_thumbnails(
+    video_id: str,
+) -> dict[PIL.Image.Image | None]:
+  """Retrieve the best resolution of each .
 
   Args:
-      file_names: The an ordered list of thumbnail filenames to check.
       video_id: The id of YouTube video.
 
   Returns:
       A dictionary with the thumbnail's url as the key and an Image object as
       value. Returns an empty dictionary if no thumbnails were found.
   """
-  logger.info('Getting the best resolution for %s', file_names)
+  thumbnails = {}
+  for names in THUMBNAIL_RESOLUTIONS:
+    for name in names:
+      url = THUMBNAIL_URL_TEMPLATE.format(
+          video_id=video_id, thumbnail_name=name
+      )
 
-  for file_name in file_names:
-    url = THUMBNAIL_URL.format(video_id=video_id, thumbnail_name=file_name)
-
-    response = requests.get(url, stream=True)
-    if requests.get(url).status_code == 200:
-      logger.info('Best resolution was found at %s', url)
-      return {url: PIL.Image.open(response.raw)}
-  logger.info('Did not find a usable thumbnail for video %s', video_id)
-  return {}
+      response = requests.get(url, stream=True)
+      if requests.get(url).status_code == 200:
+        logger.info('Best resolution was found at %s', url)
+        thumbnails[url] = PIL.Image.open(response.raw)
+        break
+  if thumbnails:
+    return thumbnails
+  else:
+    logger.info('Did not find any usable thumbnails for video %s', video_id)
+    return {}
 
 
 def _write_results_to_bq(data: pd.DataFrame, table_id: str) -> None:
