@@ -305,4 +305,3 @@ def send_messages_to_pubsub(customer_id: str, blob_name: str) -> None:
       gcp_project=GOOGLE_CLOUD_PROJECT,
   )
   logger.info('Message published')
-

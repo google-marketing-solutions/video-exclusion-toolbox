@@ -1,3 +1,17 @@
+# Copyright 2023 Google LLC
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # DATASET ----------------------------------------------------------------------
 resource "google_bigquery_dataset" "dataset" {
   dataset_id                 = var.bq_dataset
@@ -99,6 +113,14 @@ resource "google_bigquery_table" "youtube_video_table" {
   deletion_protection = false
   depends_on = [google_bigquery_dataset.dataset]
   schema              = file("../src/youtube_video/bq_schema.json")
+}
+
+resource "google_bigquery_table" "youtube_thubmnails_table" {
+  dataset_id          = google_bigquery_dataset.dataset.dataset_id
+  table_id            = "YouTubeThumbnailsWithAnnotations"
+  deletion_protection = false
+  depends_on = [google_bigquery_dataset.dataset]
+  schema              = file("../src/youtube_thumbnails_process/bq_schema.json")
 }
 
 # VIEWS ------------------------------------------------------------------------
