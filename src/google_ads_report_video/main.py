@@ -124,7 +124,7 @@ def get_report_df(
   """
   logger.info('Getting report stream for %s', customer_id)
   now = datetime.datetime.now()
-  client = GoogleAdsClient.load_from_env(version='v13')
+  client = GoogleAdsClient.load_from_env(version='v14')
   ga_service = client.get_service('GoogleAdsService')
 
   query = get_report_query(lookback_days, gads_filters)
@@ -325,4 +325,3 @@ def send_messages_to_pubsub(customer_id: str, blob_name: str) -> None:
       gcp_project=GOOGLE_CLOUD_PROJECT,
   )
   logger.info('Message published')
-

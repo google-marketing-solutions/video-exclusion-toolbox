@@ -1,8 +1,8 @@
-google-ads
-google-cloud-bigquery
-google-cloud-pubsub
-google-cloud-storage
-jsonschema
-pandas
-protobuf
-pyarrow
+google-ads==21.3.0
+google-cloud-bigquery==3.5.0
+google-cloud-pubsub==2.18.3
+google-cloud-storage==2.10.0
+jsonschema==4.19.0
+pandas==2.1.0
+protobuf==4.24.2
+pyarrow==13.0.0

@@ -62,5 +62,11 @@ variable "bq_dataset" {
 variable "looker_studio_template" {
   type        = string
   description = "The ID of the template Looker Studio dashboard"
-  default     = "2194043e-84bb-432b-b3e6-0553369745be" 
+  default     = "2194043e-84bb-432b-b3e6-0553369745be"
+}
+
+variable "crop_and_store_objects" {
+  type        = bool
+  description = "Switch whether to process the objects detected in a thumbnail."
+  default     = true
 }

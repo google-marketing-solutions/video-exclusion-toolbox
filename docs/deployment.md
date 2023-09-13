@@ -51,27 +51,29 @@ https://www.googleapis.com/auth/adwords
 ### Manual Steps
 These changes need to be done once manually, as they are not controlled by Terraform:
 
+1. If you want to use the sample Looker Studio dashboard to display the data, 
+   request access to [this dashboard](https://lookerstudio.google.com/c/reporting/2194043e-84bb-432b-b3e6-0553369745be). The deployment process will prompt you to create a copy of it later on. Once you've been granted access, proceed with the next step. This is optional and you can create your own dashboards to connect to the BigQuery datasets.
 1. Open the Google Cloud Project in the UI.
-2. Go to [Cloud Storage](https://console.cloud.google.com/storage/browser) and
+1. Go to [Cloud Storage](https://console.cloud.google.com/storage/browser) and
    create a new bucket, which will be used to keep track of the Terraform state,
    e.g. `my-awesome-project-terraform`. Make a note of the name of the bucket.
-3. Open the [OAuth Consent Screen](
+1. Open the [OAuth Consent Screen](
    https://console.cloud.google.com/apis/credentials/consent) and create a new
    internal app.
-4. Open the [API Credentials Screen](
+1. Open the [API Credentials Screen](
    https://console.cloud.google.com/apis/credentials) -> Create credentials ->
    OAuth Client ID -> Web app -> Set
    `https://developers.google.com/oauthplayground` as an authorised redirect
    URI. Make a note of the `client_id` and the `client_secret`.
-5. Open the [OAuth playground](https://developers.google.com/oauthplayground/#step1&scopes=https%3A//www.googleapis.com/auth/spreadsheets.readonly%20https%3A//www.googleapis.com/auth/cloud-platform%20https%3A//www.googleapis.com/auth/youtue%20https%3A//www.googleapis.com/auth/adwords&useDefaultOauthCred=checked),
+1. Open the [OAuth playground](https://developers.google.com/oauthplayground/#step1&scopes=https%3A//www.googleapis.com/auth/spreadsheets.readonly%20https%3A//www.googleapis.com/auth/cloud-platform%20https%3A//www.googleapis.com/auth/youtube%20https%3A//www.googleapis.com/auth/adwords&useDefaultOauthCred=checked),
    and generate a refresh token for the [above scopes](#oauth), using the
    `client_id` and `client_secret` generated in the previous step
-6. Open Cloud Shell:
+1. Open Cloud Shell:
    ![cloud-shell](./images/cloud-shell.png)
-7. Enable the APIs in the project by running the following:
+1. Enable the APIs in the project by running the following:
 
    ```
-   gcloud services enable \
+   gcloud services enable \ 
       serviceusage.googleapis.com \
       cloudresourcemanager.googleapis.com \
       iam.googleapis.com \
@@ -92,7 +94,7 @@ https://medium.com/rockedscience/how-to-fully-automate-the-deployment-of-google-
 
 1. Whilst still in Cloud shell, `git clone` the project, and `cd` into the
    directory.
-2. Run the following commands to initialise Terraform:
+1. Run the following commands to initialise Terraform:
    ```
    cd terraform
    terraform init
@@ -100,7 +102,7 @@ https://medium.com/rockedscience/how-to-fully-automate-the-deployment-of-google-
    When prompted, enter the name of the bucket created in step 2 in manual
    steps.
 
-3. Create a file named `terraform.tfvars` and add the following variables:
+1. Create a file named `terraform.tfvars` and add the following variables:
    ```
    project_id = ""
    oauth_refresh_token = ""
@@ -113,9 +115,9 @@ https://medium.com/rockedscience/how-to-fully-automate-the-deployment-of-google-
    Note that the `google_ads_login_customer_id` is the MCC customer ID in Google
    Ads.
 
-4. Run `terraform plan` and review the proposed changes.
-5. Run `terraform apply` to create the infrastructure.
-6. The email of the service account created will be output, give view only
+1. Run `terraform plan` and review the proposed changes.
+1. Run `terraform apply` to create the infrastructure.
+1. The email of the service account created will be output, give view only
    access to the Google sheet containing the config.
 
 By default, the code will be triggered every hour by Cloud Scheduler. You can run it less often by updating the Cloud Scheduler trigger.

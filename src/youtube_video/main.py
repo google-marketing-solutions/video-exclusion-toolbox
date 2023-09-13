@@ -15,15 +15,19 @@
 """Pull YouTube video data for the placements in the Google Ads report."""
 import base64
 import datetime
+import hashlib
 import json
 import logging
 import os
 import sys
+import time
 from typing import Any, Dict, List
+
+from google.api_core import exceptions
 import google.auth
 import google.auth.credentials
 from google.cloud import bigquery
-from googleapiclient.discovery import build
+from googleapiclient import discovery
 import jsonschema
 import numpy as np
 import pandas as pd
@@ -88,34 +92,35 @@ def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
   # Will raise jsonschema.exceptions.ValidationError if the schema is invalid
   jsonschema.validate(instance=message_json, schema=message_schema)
 
-  run(message_json.get('customer_id'), message_json.get('blob_name'))
+  run(message_json.get('blob_name'))
 
   logger.info('Done')
 
 
-def run(customer_id: str, blob_name: str) -> None:
+def run(blob_name: str) -> None:
   """Orchestration to pull YouTube data and output it to BigQuery.
 
   Args:
-      customer_id: The Google Ads customer ID to process.
       blob_name: The name of the newly created account report file.
   """
   credentials = get_auth_credentials()
 
   # step 1: Pull list of YT Video IDs from the blob
   # Open blob and get specifc column
-  df = pd.read_csv(f'gs://{VID_EXCL_GCS_DATA_BUCKET}/{blob_name}')
-  video_ids = list(df['video_id'])
+  data = pd.read_csv(f'gs://{VID_EXCL_GCS_DATA_BUCKET}/{blob_name}')
+  video_ids = data[['video_id']].drop_duplicates()
   # for channel_ids not in BQ, run the following
   logger.info('Checking new videos')
   logger.info('Connecting to: %s BigQuery', GOOGLE_CLOUD_PROJECT)
   client = bigquery.Client(
       project=GOOGLE_CLOUD_PROJECT, credentials=credentials
   )
+  temp_table = temp_table_from_csv(video_ids, client)
+  logger.info('Filtering previously processed videos.')
   query = f"""
-            SELECT *
+            SELECT video_id
             FROM
-            UNNEST({video_ids}) as video_id
+            `{BQ_DATASET}.{temp_table}`
             WHERE
             video_id NOT IN (SELECT video_id FROM `{BQ_DATASET}.YouTubeVideo`)
             """
@@ -126,7 +131,7 @@ def run(customer_id: str, blob_name: str) -> None:
   logger.info('Found %d new video_ids', len(video_ids_to_check))
 
   if video_ids_to_check:
-    get_youtube_videos_dataframe(video_ids_to_check, customer_id, credentials)
+    get_youtube_videos_dataframe(video_ids_to_check, credentials)
   else:
     logger.info('No new video IDs to process')
   logger.info('Done')
@@ -138,9 +143,64 @@ def get_auth_credentials() -> google.auth.credentials.Credentials:
   return credentials
 
 
+def temp_table_from_csv(df: pd.DataFrame, client: bigquery.Client) -> str:
+  """Creates a temporary BQ table to store video IDs for querying.
+
+  Args:
+      df: A dataframe containign the video IDs to be written.
+      client: A BigQuery client object.
+
+  Returns:
+      The name of the temporary table.
+  """
+
+  timestamp = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+  suffix = hashlib.sha256(timestamp.encode('utf-8')).hexdigest()[:6]
+  table_name = '-'.join(['temp-video-ids', suffix, timestamp])
+  destination = '.'.join([GOOGLE_CLOUD_PROJECT, BQ_DATASET, table_name])
+  logger.info('Creating a temporary table: %s', table_name)
+
+  job_config = bigquery.LoadJobConfig(
+      schema=[
+          bigquery.SchemaField('video_id', bigquery.enums.SqlTypeNames.STRING),
+      ],
+      write_disposition='WRITE_TRUNCATE',
+  )
+
+  job = client.load_table_from_dataframe(
+      dataframe=df, destination=destination, job_config=job_config
+  )
+  job.result()
+
+  expiration = datetime.datetime.now(
+      datetime.timezone.utc
+  ) + datetime.timedelta(hours=1)
+
+  # This is not elegant, but necessary. BQ seems to sometimes refuse to update
+  # table's metadata shortly after creating it. Retrying after a few seconds
+  # is a crude, but working workaround.
+  try:
+    table = client.get_table(destination)
+    table.expires = expiration
+    client.update_table(table, ['expires'])
+  except exceptions.PreconditionFailed:
+    logger.info(
+        "Failed to update expiration for table '%s' wating 5 seconds and"
+        ' retrying.',
+        table_name
+    )
+    time.sleep(5)
+    table = client.get_table(destination)
+    table.expires = expiration
+    client.update_table(table, ['expires'])
+
+  logger.info("Table '%s' created.", table_name)
+
+  return table_name
+
+
 def get_youtube_videos_dataframe(
     video_ids: List[str],
-    customer_id: str,
     credentials: google.auth.credentials.Credentials,
 ) -> None:
   """Pulls information on each of the videos provided from the YouTube API.
@@ -152,7 +212,6 @@ def get_youtube_videos_dataframe(
 
   Args:
       video_ids: The video IDs to pull the info on from YouTube.
-      customer_id: The Google Ads customer ID to process.
       credentials: Google Auth credentials.
   """
   logger.info('Getting YouTube data for video IDs')
@@ -161,7 +220,7 @@ def get_youtube_videos_dataframe(
   number_of_chunks = len(chunks)
 
   logger.info('Connecting to the youtube API')
-  youtube = build('youtube', 'v3', credentials=credentials)
+  youtube = discovery.build('youtube', 'v3', credentials=credentials)
   all_videos = []
   for i, chunk in enumerate(chunks):
     logger.info('Processing chunk %s of %s', i + 1, number_of_chunks)
@@ -210,13 +269,27 @@ def sanitise_youtube_dataframe(youtube_df: pd.DataFrame) -> pd.DataFrame:
   Returns:
       The YouTube dataframe but sanitised to be safe to write to a CSV.
   """
-  youtube_df = youtube_df.astype({
-      'viewCount': 'Int64',
-      'likeCount': 'Int64',
-      'commentCount': 'Int64',
-      'categoryId': 'Int64',
-      'publishedAt': 'datetime64',
-  })
+  youtube_df['viewCount'] = youtube_df['viewCount'].fillna(0)
+  youtube_df['likeCount'] = youtube_df['likeCount'].fillna(0)
+  youtube_df['commentCount'] = youtube_df['commentCount'].fillna(0)
+  youtube_df['categoryId'] = youtube_df['categoryId'].fillna(0)
+  youtube_df['publishedAt'] = pd.to_datetime(
+      youtube_df['publishedAt'], errors='coerce'
+  )
+  youtube_df['publishedAt'] = youtube_df['publishedAt'].dt.tz_localize(None)
+  try:
+    youtube_df = youtube_df.astype({
+        'viewCount': 'Int64',
+        'likeCount': 'Int64',
+        'commentCount': 'Int64',
+        'categoryId': 'Int64',
+        'publishedAt': 'datetime64[ns]',
+    })
+  except TypeError:
+    logger.info('Unable to sanitise DataFrame:')
+    logger.info(youtube_df)
+    raise
+
   # remove problematic characters from the title field as the break BigQuery
   # even when escaped in the CSV
   youtube_df['title'] = youtube_df['title'].str.replace(

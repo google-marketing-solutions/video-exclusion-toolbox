@@ -14,16 +14,20 @@
 """Pull YouTube data for the placements in the Google Ads report."""
 import base64
 import datetime
+import hashlib
 import json
 import logging
 import math
 import os
 import sys
+import time
 from typing import Any, Dict, List
+
+from google.api_core import exceptions
 import google.auth
 import google.auth.credentials
 from google.cloud import bigquery
-from googleapiclient.discovery import build
+from googleapiclient import discovery
 import jsonschema
 import numpy as np
 import pandas as pd
@@ -37,14 +41,14 @@ logger.setLevel(logging.INFO)
 # The Google Cloud project
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 # The bucket to write the data to
-VID_EXCL_GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
+GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
 # The name of the BigQuery Dataset
 BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 
 # Optional variable to specify the problematic CSV characters. This is an env
 # variable, so if any other characters come up they can be replaced in the
 # Cloud Function UI without redeploying the solution.
-VID_EXCL_CSV_PROBLEM_CHARACTERS_REGEX = os.environ.get(
+CSV_PROBLEM_CHARACTERS_REGEX = os.environ.get(
     'VID_EXCL_CSV_PROBLEM_CHARACTERS', r'\$|\"|\'|\r|\n|\t|,|;|:'
 )
 
@@ -93,59 +97,55 @@ def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
   # Will raise jsonschema.exceptions.ValidationError if the schema is invalid
   jsonschema.validate(instance=message_json, schema=message_schema)
 
-  run(message_json.get('customer_id'), message_json.get('blob_name'))
+  run(message_json.get('blob_name'))
 
   logger.info('Done')
 
 
-def run(customer_id: str, blob_name: str) -> None:
+def run(blob_name: str) -> None:
   """Orchestration to pull YouTube data and output it to BigQuery.
 
   Args:
-      customer_id: The Google Ads customer ID to process.
       blob_name: The name of the newly created account report file.
   """
   credentials = get_auth_credentials()
 
   # step 1: Pull list of YT channels IDs from the blob
   # Open blob and get specifc column
-  df = pd.read_csv(f'gs://{VID_EXCL_GCS_DATA_BUCKET}/{blob_name}')
-  channel_ids = list(df['channel_id'])
+  data = pd.read_csv(f'gs://{GCS_DATA_BUCKET}/{blob_name}')
+  channel_ids = data[['channel_id']].drop_duplicates()
   # for channel_ids not in BQ, run the following
   logger.info('Checking new channels')
   logger.info('Connecting to: %s BigQuery', GOOGLE_CLOUD_PROJECT)
   client = bigquery.Client(
       project=GOOGLE_CLOUD_PROJECT, credentials=credentials
   )
+  temp_table = temp_table_from_csv(channel_ids, client)
+  logger.info('Filtering previously processed channels.')
   query = f"""
-            SELECT *
+            SELECT channel_id
             FROM
-            UNNEST({channel_ids}) as channel_id
+            `{BQ_DATASET}.{temp_table}`
             WHERE
-            channel_id NOT IN (SELECT channel_id FROM `{BQ_DATASET}.YouTubeChannel`)
+            channel_id NOT IN (
+                SELECT channel_id FROM `{BQ_DATASET}.YouTubeChannel`
+            )
             """
   rows = client.query(query).result()
-  channel_ids_to_check = []
+  channel_ids_to_check = set()
   for row in rows:
-    channel_ids_to_check.append(row.channel_id)
+    channel_ids_to_check.add(row.channel_id)
   logger.info('Found %s new channel_ids', len(channel_ids_to_check))
 
   if channel_ids_to_check:
-    get_youtube_dataframe(channel_ids_to_check, customer_id, credentials)
+    get_youtube_dataframe(channel_ids_to_check, credentials)
   else:
     logger.info('No new channel IDs to process')
   logger.info('Done')
 
 
-def get_auth_credentials() -> google.auth.credentials.Credentials:
-  """Returns credentials for Google APIs."""
-  credentials, _ = google.auth.default()
-  return credentials
-
-
 def get_youtube_dataframe(
-    channel_ids: List[str],
-    customer_id: str,
+    channel_ids: set[str],
     credentials: google.auth.credentials.Credentials,
 ) -> None:
   """Pulls information on each of the channels provide from the YouTube API.
@@ -157,15 +157,14 @@ def get_youtube_dataframe(
 
   Args:
       channel_ids: The channel IDs to pull the info on from YouTube.
-      customer_id: The Google Ads customer ID to process.
       credentials: Google Auth credentials
   """
   logger.info('Getting YouTube data for channel IDs')
-  chunks = split_list_to_chunks(channel_ids, CHUNK_SIZE)
+  chunks = split_list_to_chunks(list(channel_ids), CHUNK_SIZE)
   number_of_chunks = len(chunks)
 
   logger.info('Connecting to the youtube API')
-  youtube = build('youtube', 'v3', credentials=credentials)
+  youtube = discovery.build('youtube', 'v3', credentials=credentials)
   all_channels = []
   for i, chunk in enumerate(chunks):
     logger.info('Processing chunk %s of %s', i + 1, number_of_chunks)
@@ -198,6 +197,70 @@ def get_youtube_dataframe(
   logger.info('YouTube channel info complete')
 
 
+def get_auth_credentials() -> google.auth.credentials.Credentials:
+  """Returns credentials for Google APIs."""
+  credentials, _ = google.auth.default()
+  return credentials
+
+
+def temp_table_from_csv(data: pd.DataFrame, client: bigquery.Client) -> str:
+  """Creates a temporary BQ table to store video IDs for querying.
+
+  Args:
+      data: A dataframe containing the video IDs to be written.
+      client: The object to connect to BQ.
+
+  Returns:
+      The name of the temporary table.
+  """
+
+  timestamp = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+  suffix = hashlib.sha256(timestamp.encode('utf-8')).hexdigest()[:6]
+  table_name = '-'.join(['temp-channel-ids', suffix, timestamp])
+  destination = '.'.join([GOOGLE_CLOUD_PROJECT, BQ_DATASET, table_name])
+  logger.info('Creating a temporary table: %s', table_name)
+
+  job_config = bigquery.LoadJobConfig(
+      schema=[
+          bigquery.SchemaField(
+              'channel_id', bigquery.enums.SqlTypeNames.STRING
+          ),
+      ],
+      write_disposition='WRITE_TRUNCATE',
+  )
+
+  job = client.load_table_from_dataframe(
+      dataframe=data, destination=destination, job_config=job_config
+  )
+  job.result()
+
+  expiration = datetime.datetime.now(
+      datetime.timezone.utc
+  ) + datetime.timedelta(hours=1)
+
+  # This is not elegant, but necessary. BQ seems to sometimes refuse to update
+  # table's metadata shortly after creating it. Retrying after a few seconds
+  # is a crude, but working workaround.
+  try:
+    table = client.get_table(destination)
+    table.expires = expiration
+    client.update_table(table, ['expires'])
+  except exceptions.PreconditionFailed:
+    logger.info(
+        "Failed to update expiration for table '%s' wating 5 seconds and"
+        ' retrying.',
+        table_name
+    )
+    time.sleep(5)
+    table = client.get_table(destination)
+    table.expires = expiration
+    client.update_table(table, ['expires'])
+
+  logger.info("Table '%s' created.", table_name)
+
+  return table_name
+
+
 def sanitise_youtube_dataframe(youtube_df: pd.DataFrame) -> pd.DataFrame:
   """Takes the dataframe from YouTube and sanitises it to write as a CSV.
 
@@ -207,6 +270,9 @@ def sanitise_youtube_dataframe(youtube_df: pd.DataFrame) -> pd.DataFrame:
   Returns:
       The YouTube dataframe but sanitised to be safe to write to a CSV.
   """
+  youtube_df['view_count'] = youtube_df['view_count'].fillna(0)
+  youtube_df['video_count'] = youtube_df['video_count'].fillna(0)
+  youtube_df['subscriber_count'] = youtube_df['subscriber_count'].fillna(0)
   youtube_df = youtube_df.astype({
       'view_count': 'int',
       'video_count': 'int',
@@ -215,7 +281,7 @@ def sanitise_youtube_dataframe(youtube_df: pd.DataFrame) -> pd.DataFrame:
   # remove problematic characters from the title field as the break BigQuery
   # even when escaped in the CSV
   youtube_df['title'] = youtube_df['title'].str.replace(
-      VID_EXCL_CSV_PROBLEM_CHARACTERS_REGEX, '', regex=True
+      CSV_PROBLEM_CHARACTERS_REGEX, '', regex=True
   )
   youtube_df['title'] = youtube_df['title'].str.strip()
   return youtube_df
@@ -273,8 +339,8 @@ def process_youtube_response(
     data.append([
         channel.get('id'),
         channel.get('statistics').get('viewCount', None),
-        channel.get('statistics').get('subscriberCount', None),
         channel.get('statistics').get('videoCount', None),
+        channel.get('statistics').get('subscriberCount', None),
         channel.get('snippet').get('title', ''),
         channel.get('snippet').get('country', ''),
         topic_categories,
