@@ -17,36 +17,24 @@ resource "google_secret_manager_secret" "oauth_refresh_token_secret" {
   replication {
     automatic = true
   }
-  depends_on = [
-    google_project_service.gcp_services
-  ]
 }
 resource "google_secret_manager_secret" "client_id_secret" {
   secret_id = "vid-excl-client-id-secret"
   replication {
     automatic = true
   }
-  depends_on = [
-    google_project_service.gcp_services
-  ]
 }
 resource "google_secret_manager_secret" "client_secret_secret" {
   secret_id = "vid-excl-client-secret-secret"
   replication {
     automatic = true
   }
-  depends_on = [
-    google_project_service.gcp_services
-  ]
 }
 resource "google_secret_manager_secret" "developer_token_secret" {
   secret_id = "vid-excl-developer-token-secret"
   replication {
     automatic = true
   }
-  depends_on = [
-    google_project_service.gcp_services
-  ]
 }
 
 resource "google_secret_manager_secret_version" "oauth_refresh_token_secret_version" {
