@@ -66,8 +66,8 @@ IMAGE_FEATURE_TYPES = [
     {'type_': vision.Feature.Type.LABEL_DETECTION},
 ]
 
-THUMBNAIL_RESOLUTIONS = [
-    [
+THUMBNAIL_RESOLUTIONS = (
+    (
         'maxresdefault',
         'hq720',
         'sddefault',
@@ -75,11 +75,11 @@ THUMBNAIL_RESOLUTIONS = [
         '0',
         'mqdefault',
         'default',
-    ],
-    ['sd1', 'hq1', 'mq1', '1'],
-    ['sd2', 'hq2', 'mq2', '2'],
-    ['sd3', 'hq3', 'mq3', '3'],
-]
+    ),
+    ('sd1', 'hq1', 'mq1', '1'),
+    ('sd2', 'hq2', 'mq2', '2'),
+    ('sd3', 'hq3', 'mq3', '3'),
+)
 
 # The schema of the JSON in the event payload.
 MESSAGE_SCHEMA = {
@@ -148,7 +148,7 @@ def run(video_id: str) -> None:
     logger.info('Thumbnails for video %s already processed.', video_id)
   else:
     _process_video(video_id)
-    logger.info('Processed thumbnails for video %s.', video_id)
+    logger.info('Finished processing thumbnails for video %s.', video_id)
 
 
 def _process_video(video_id: str) -> None:
@@ -157,7 +157,7 @@ def _process_video(video_id: str) -> None:
   Args:
       video_id: The YouTube Video ID to process.
   """
-  logger.info('Looking up thumbnails for video %s', video_id)
+  logger.info('Looking up thumbnails for video %s.', video_id)
   thumbnails = _get_best_resolution_thumbnails(video_id=video_id)
 
   extracted_data = []
@@ -176,6 +176,13 @@ def _process_video(video_id: str) -> None:
     return
 
   extracted_data = pd.concat(extracted_data, ignore_index=True)
+
+  if extracted_data.empty:
+    logger.info(
+        'No features extracted from thumbnails for video %s.',
+        video_id,
+    )
+    return
 
   logger.info(
       'Extracted %d object(s) from %d thumbnail(s).',
@@ -309,7 +316,7 @@ def _generate_thumbnail_name(video_id: str, video_url: str, label: str) -> str:
   # The "_" is for conciseness and readability purposes only, there's no
   # technical requirement, and so a simplictic replacement is sufficient.
   sanitized_url = sanitized_url.replace('___', '_').replace('__', '_')
-  return f'{video_id}/{label}-{str(uuid.uuid4())[-6:]}-{sanitized_url}.png'
+  return f'{video_id}/{label}-{str(uuid.uuid4())[-6:]}-{sanitized_url}'
 
 
 def _save_image_to_gcs(
@@ -456,7 +463,7 @@ def _parse_label_annotations(
 def _get_best_resolution_thumbnails(
     video_id: str,
 ) -> dict[PIL.Image.Image | None]:
-  """Retrieve the best resolution of each .
+  """Retrieve the best resolution of each video's thumbnails.
 
   Args:
       video_id: The id of YouTube video.
