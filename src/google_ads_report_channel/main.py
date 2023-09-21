@@ -34,9 +34,9 @@ logger.setLevel(logging.INFO)
 # The Google Cloud project containing the GCS bucket
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 # The bucket to write the data to
-VID_EXCL_GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
+GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
 # The pub/sub topic to send the success message to
-VID_EXCL_YOUTUBE_CHANNEL_PUBSUB_TOPIC = os.environ.get(
+YOUTUBE_CHANNEL_PUBSUB_TOPIC = os.environ.get(
     'VID_EXCL_YOUTUBE_CHANNEL_PUBSUB_TOPIC'
 )
 
@@ -190,7 +190,6 @@ def get_report_query(
   """
   logger.info('Getting chnanel report query')
   date_from, date_to = get_query_dates(lookback_days)
-  where_query = ''
   if lookback_days > 1:
     where_query = f'AND segments.date BETWEEN "{date_from}" AND "{date_to}"'
   else:
@@ -252,12 +251,12 @@ def get_query_dates(
 
 
 def write_results_to_gcs(
-    report_df: pd.DataFrame, lookback_days: int, customer_id: str
+    data: pd.DataFrame, lookback_days: int, customer_id: str
 ) -> str:
   """Writes the report dataframe to GCS as a CSV file.
 
   Args:
-      report_df: The dataframe based on the Google Ads report.
+      data: The dataframe based on the Google Ads report.
       lookback_days: The number of days from today to look back when the report
         was fetched.
       customer_id: The customer ID to fetch the Google Ads data for.
@@ -266,8 +265,8 @@ def write_results_to_gcs(
       The name of the newly created blob.
   """
   date_from, date_to = get_query_dates(lookback_days)
-  logger.info('Writing results to GCS: %s', VID_EXCL_GCS_DATA_BUCKET)
-  number_of_rows = len(report_df.index)
+  logger.info('Writing results to GCS: %s', GCS_DATA_BUCKET)
+  number_of_rows = len(data.index)
   logger.info('There are %s rows', number_of_rows)
   if number_of_rows > 0:
     if lookback_days > 1:
@@ -278,7 +277,7 @@ def write_results_to_gcs(
       blob_name = f'google_ads_report_channel/{customer_id}_{date_to}.csv'
     logger.info('Blob name: %s', blob_name)
     gcs.upload_blob_from_df(
-        df=report_df, blob_name=blob_name, bucket=VID_EXCL_GCS_DATA_BUCKET
+        df=data, blob_name=blob_name, bucket=GCS_DATA_BUCKET
     )
     logger.info('Blob uploaded to GCS')
     return blob_name
@@ -301,7 +300,7 @@ def send_messages_to_pubsub(customer_id: str, blob_name: str) -> None:
   logger.info('Sending message to pub/sub: %s', message_dict)
   pubsub.send_dict_to_pubsub(
       message_dict=message_dict,
-      topic=VID_EXCL_YOUTUBE_CHANNEL_PUBSUB_TOPIC,
+      topic=YOUTUBE_CHANNEL_PUBSUB_TOPIC,
       gcp_project=GOOGLE_CLOUD_PROJECT,
   )
   logger.info('Message published')

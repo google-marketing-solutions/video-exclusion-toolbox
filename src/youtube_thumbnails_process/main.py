@@ -148,7 +148,7 @@ def run(video_id: str) -> None:
     logger.info('Thumbnails for video %s already processed.', video_id)
   else:
     _process_video(video_id)
-    logger.info('Processed thumbnails for video %s.', video_id)
+    logger.info('Finished processing thumbnails for video %s.', video_id)
 
 
 def _process_video(video_id: str) -> None:
@@ -157,7 +157,7 @@ def _process_video(video_id: str) -> None:
   Args:
       video_id: The YouTube Video ID to process.
   """
-  logger.info('Looking up thumbnails for video %s', video_id)
+  logger.info('Looking up thumbnails for video %s.', video_id)
   thumbnails = _get_best_resolution_thumbnails(video_id=video_id)
 
   extracted_data = []
@@ -176,6 +176,13 @@ def _process_video(video_id: str) -> None:
     return
 
   extracted_data = pd.concat(extracted_data, ignore_index=True)
+
+  if extracted_data.empty:
+    logger.info(
+        'No features extracted from thumbnails for video %s.',
+        video_id,
+    )
+    return
 
   logger.info(
       'Extracted %d object(s) from %d thumbnail(s).',
