@@ -73,7 +73,7 @@ These changes need to be done once manually, as they are not controlled by Terra
 1. Enable the APIs in the project by running the following:
 
    ```
-   gcloud services enable \ 
+   gcloud services enable \
       serviceusage.googleapis.com \
       cloudresourcemanager.googleapis.com \
       iam.googleapis.com \
@@ -83,7 +83,9 @@ These changes need to be done once manually, as they are not controlled by Terra
       cloudfunctions.googleapis.com \
       cloudbuild.googleapis.com \
       sheets.googleapis.com \
-      cloudscheduler.googleapis.com
+      cloudscheduler.googleapis.com \
+      secretmanager.googleapis.com \
+      vision.googleapis.com
    ```
 
 _Side note_: If you're interested in the reason why the APIs aren't controlled

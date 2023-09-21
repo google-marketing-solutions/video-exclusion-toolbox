@@ -24,8 +24,10 @@ import json
 import logging
 import os
 import sys
+import time
 from typing import Any, Dict
 
+from google.api_core import exceptions
 import google.auth
 import google.auth.credentials
 from google.cloud import bigquery
@@ -36,12 +38,6 @@ import pandas as pd
 logging.basicConfig(stream=sys.stdout)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-# Governs whether object crop-outs will be generated for the thumbnail.
-CROP_AND_STORE_OBJECTS = os.environ.get('CROP_AND_STORE_OBJECTS')
-# Selector of what labels of objects will be cropped out.
-# For age recognition, 'Face' and 'Parson' are recommended.
-OBJECTS_TO_CROP_AND_STORE = ['Face', 'Person']
 
 # The Google Cloud project containing the pub/sub topic
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
@@ -93,7 +89,7 @@ def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
 
   run(blob_name=message_json.get('blob_name'))
 
-  logger.info('Done')
+  logger.info('Done dispatching video_ids for thumbnail processing.')
 
 
 def run(blob_name: str) -> None:
@@ -125,16 +121,21 @@ def run(blob_name: str) -> None:
             """
   rows = client.query(query).result()
   if rows.total_rows is not None and rows.total_rows > 0:
-    logger.info('Processing thumbnails for %d new video_ids.', rows.total_rows)
+    logger.info(
+        '%d new video_id(s) to be dispatched for thumbnail processing.',
+        rows.total_rows,
+    )
+    counter = 1
     for row in rows:
       _send_video_for_processing(
           video_id=row.video_id,
           topic=THUMBNAIL_PROCESSING_TOPIC,
-          gcp_project=GOOGLE_CLOUD_PROJECT
+          gcp_project=GOOGLE_CLOUD_PROJECT,
       )
+      logger.info('Dispatched %d of %d.', counter, rows.total_rows)
+      counter += 1
   else:
     logger.info('No new video IDs to process.')
-  logger.info('Done.')
 
 
 def _send_video_for_processing(
@@ -153,7 +154,7 @@ def _send_video_for_processing(
   # Data must be a bytestring
   data = message_str.encode('utf-8')
   publisher.publish(topic_path, data)
-  logger.info('Video %s sent for thumbnail processing.', video_id)
+  logger.info('Video %s dispatched for thumbnail processing.', video_id)
 
 
 def temp_table_from_csv(data: pd.DataFrame, client: bigquery.Client) -> str:
@@ -186,12 +187,28 @@ def temp_table_from_csv(data: pd.DataFrame, client: bigquery.Client) -> str:
   )
   job.result()
 
-  table = client.get_table(destination)
   expiration = datetime.datetime.now(
       datetime.timezone.utc
   ) + datetime.timedelta(hours=1)
-  table.expires = expiration
-  client.update_table(table, ['expires'])
+
+  # This is not elegant, but necessary. BQ seems to sometimes refuse to update
+  # table's metadata shortly after creating it. Retrying after a few seconds
+  # is a crude, but working workaround.
+  try:
+    table = client.get_table(destination)
+    table.expires = expiration
+    client.update_table(table, ['expires'])
+  except exceptions.PreconditionFailed:
+    logger.info(
+        "Failed to update expiration for table '%s' wating 5 seconds and"
+        ' retrying.',
+        table_name
+    )
+    time.sleep(5)
+    table = client.get_table(destination)
+    table.expires = expiration
+    client.update_table(table, ['expires'])
+
   logger.info('Table \'%s\' created.', table_name)
 
   return table_name

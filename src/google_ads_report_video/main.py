@@ -26,6 +26,7 @@ import pandas as pd
 from utils import gcs
 from utils import pubsub
 
+CHARS_TO_REPLACE_IN_VIDEO_NAME = ('\'', '\r', '\n', '\t', '$', '"', ',')
 
 logging.basicConfig(stream=sys.stdout)
 logger = logging.getLogger(__name__)
@@ -34,9 +35,9 @@ logger.setLevel(logging.INFO)
 # The Google Cloud project containing the GCS bucket
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 # The bucket to write the data to
-VID_EXCL_GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
+GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
 # The pub/sub topic to send the success message to
-VID_EXCL_YOUTUBE_VIDEO_PUBSUB_TOPIC = os.environ.get(
+YOUTUBE_VIDEO_PUBSUB_TOPIC = os.environ.get(
     'VID_EXCL_YOUTUBE_VIDEO_PUBSUB_TOPIC'
 )
 
@@ -140,11 +141,14 @@ def get_report_df(
   data = []
   for batch in stream:
     for row in batch.results:
+      sanitized_video_name = _sanitize_video_name(
+          row.detail_placement_view.display_name, CHARS_TO_REPLACE_IN_VIDEO_NAME
+      )
       data.append([
           now,
           row.customer.id,
           row.detail_placement_view.placement,
-          row.detail_placement_view.display_name.replace(',', ' '),
+          sanitized_video_name,
           row.detail_placement_view.target_url,
           row.detail_placement_view.placement_type,
           row.detail_placement_view.group_placement_target_url,
@@ -189,6 +193,25 @@ def get_report_df(
   )
 
 
+def _sanitize_video_name(
+    video_name: str, chars_to_remove: tuple[str, ...]
+) -> str:
+  """Removes all potentially problematic characters from a video name.
+
+  Args:
+    video_name: The name of the video to be sanitized.
+    chars_to_remove: The set of characters to remove from the video name.
+
+  Returns:
+    Video name, with all the problematic characters removed.
+
+  """
+  for ch in chars_to_remove:
+    if ch in video_name:
+      video_name = video_name.replace(ch, '')
+  return video_name
+
+
 def get_report_query(
     lookback_days: int, gads_filters: Optional[str] = None
 ) -> str:
@@ -204,7 +227,6 @@ def get_report_query(
   """
   logger.info('Getting report query')
   date_from, date_to = get_query_dates(lookback_days)
-  where_query = ''
   if lookback_days > 1:
     where_query = f'AND segments.date BETWEEN "{date_from}" AND "{date_to}"'
   else:
@@ -272,12 +294,12 @@ def get_query_dates(
 
 
 def write_results_to_gcs(
-    report_df: pd.DataFrame, lookback_days: int, customer_id: str
+    data: pd.DataFrame, lookback_days: int, customer_id: str
 ) -> str:
   """Writes the report dataframe to GCS as a CSV file.
 
   Args:
-      report_df: The dataframe based on the Google Ads report.
+      data: The dataframe based on the Google Ads report.
       lookback_days: The number of days from today to look back when the report
         was fetched.
       customer_id: The customer ID to fetch the Google Ads data for.
@@ -286,8 +308,8 @@ def write_results_to_gcs(
       The name of the newly created blob.
   """
   date_from, date_to = get_query_dates(lookback_days)
-  logger.info('Writing results to GCS: %s', VID_EXCL_GCS_DATA_BUCKET)
-  number_of_rows = len(report_df.index)
+  logger.info('Writing results to GCS: %s', GCS_DATA_BUCKET)
+  number_of_rows = len(data.index)
   logger.info('There are %s rows', number_of_rows)
   if number_of_rows > 0:
     if lookback_days > 1:
@@ -298,7 +320,7 @@ def write_results_to_gcs(
       blob_name = f'google_ads_report_video/{customer_id}_{date_to}.csv'
     logger.info('Blob name: %s', blob_name)
     gcs.upload_blob_from_df(
-        df=report_df, blob_name=blob_name, bucket=VID_EXCL_GCS_DATA_BUCKET
+        df=data, blob_name=blob_name, bucket=GCS_DATA_BUCKET
     )
     logger.info('Blob uploaded to GCS')
     return blob_name
@@ -321,7 +343,7 @@ def send_messages_to_pubsub(customer_id: str, blob_name: str) -> None:
   logger.info('Sending message to pub/sub %s', message_dict)
   pubsub.send_dict_to_pubsub(
       message_dict=message_dict,
-      topic=VID_EXCL_YOUTUBE_VIDEO_PUBSUB_TOPIC,
+      topic=YOUTUBE_VIDEO_PUBSUB_TOPIC,
       gcp_project=GOOGLE_CLOUD_PROJECT,
   )
   logger.info('Message published')
