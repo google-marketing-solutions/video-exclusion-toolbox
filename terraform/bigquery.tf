@@ -16,7 +16,7 @@
 resource "google_bigquery_dataset" "dataset" {
   dataset_id                 = var.bq_dataset
   location                   = var.region
-  description                = "Ads Placement Excluder BQ Dataset"
+  description                = "Video Exclusion Toolbox BQ Dataset"
   delete_contents_on_destroy = true
 }
 
@@ -53,7 +53,7 @@ resource "google_bigquery_table" "google_ads_report_video_table" {
     source_uris = [
       "gs://${google_storage_bucket.video_exclusion_data_bucket.name}/google_ads_report_video/*.csv"
     ]
-    schema = file("../src/google_ads_report_video/bq_schema.json")
+    schema = file("../bq_schemas/google_ads_report_video.json")
     csv_options {
       quote             = ""
       skip_leading_rows = "1"
@@ -72,7 +72,7 @@ resource "google_bigquery_table" "google_ads_exclusions_table" {
     source_uris = [
       "gs://${google_storage_bucket.video_exclusion_data_bucket.name}/google_ads_exclusions/*.csv"
     ]
-    schema = file("../src/google_ads_exclusions/bq_schema.json")
+    schema = file("../bq_schemas/google_ads_exclusions.json")
     csv_options {
       quote             = ""
       skip_leading_rows = "1"
@@ -91,7 +91,7 @@ resource "google_bigquery_table" "google_ads_report_channel_table" {
     source_uris = [
       "gs://${google_storage_bucket.video_exclusion_data_bucket.name}/google_ads_report_channel/*.csv"
     ]
-    schema = file("../src/google_ads_report_channel/bq_schema.json")
+    schema = file("../bq_schemas/google_ads_report_channel.json")
     csv_options {
       quote             = ""
       skip_leading_rows = "1"
@@ -104,7 +104,7 @@ resource "google_bigquery_table" "youtube_channel_table" {
   table_id            = "YouTubeChannel"
   deletion_protection = false
   depends_on = [google_bigquery_dataset.dataset]
-  schema              = file("../src/youtube_channel/bq_schema.json")
+  schema              = file("../bq_schemas/youtube_channel.json")
 }
 
 resource "google_bigquery_table" "youtube_video_table" {
@@ -112,7 +112,7 @@ resource "google_bigquery_table" "youtube_video_table" {
   table_id            = "YouTubeVideo"
   deletion_protection = false
   depends_on = [google_bigquery_dataset.dataset]
-  schema              = file("../src/youtube_video/bq_schema.json")
+  schema              = file("../bq_schemas/youtube_video.json")
 }
 
 resource "google_bigquery_table" "youtube_thubmnails_table" {
@@ -120,7 +120,7 @@ resource "google_bigquery_table" "youtube_thubmnails_table" {
   table_id            = "YouTubeThumbnailsWithAnnotations"
   deletion_protection = false
   depends_on = [google_bigquery_dataset.dataset]
-  schema              = file("../src/youtube_thumbnails_process/bq_schema.json")
+  schema              = file("../bq_schemas/youtube_thumbnail_annotation.json")
 }
 
 # VIEWS ------------------------------------------------------------------------
