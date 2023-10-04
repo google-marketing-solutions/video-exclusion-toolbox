@@ -12,13 +12,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-fsspec==2023.9.0
-gcsfs==2023.9.0
-google-auth==2.22.0
-google-cloud-bigquery==3.11.4
-google-cloud-pubsub==2.18.3
-google-cloud-vision==3.4.4
-jsonschema==4.19.0
-pandas==2.1.0
-Pillow==10.0.0
-requests==2.31.0

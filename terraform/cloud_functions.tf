@@ -53,6 +53,11 @@ data "archive_file" "youtube_thumbnails_process_zip" {
   output_path = ".temp/youtube_thumbnails_process_source.zip"
   source_dir  = "../src/youtube_thumbnails_process/"
 }
+data "archive_file" "youtube_thumbnails_generate_cropouts_zip" {
+  type        = "zip"
+  output_path = ".temp/youtube_thumbnails_generate_cropouts_source.zip"
+  source_dir  = "../src/youtube_thumbnails_generate_cropouts/"
+}
 
 resource "google_storage_bucket_object" "google_ads_accounts" {
   name       = "google_ads_accounts_${data.archive_file.google_ads_accounts_zip.output_md5}.zip"
@@ -102,12 +107,18 @@ resource "google_storage_bucket_object" "youtube_thumbnails_process" {
   source     = data.archive_file.youtube_thumbnails_process_zip.output_path
   depends_on = [data.archive_file.youtube_thumbnails_process_zip]
 }
+resource "google_storage_bucket_object" "youtube_thumbnails_generate_cropouts" {
+  name       = "youtube_thumbnails_generate_cropouts_${data.archive_file.youtube_thumbnails_generate_cropouts_zip.output_md5}.zip"
+  bucket     = google_storage_bucket.function_bucket.name
+  source     = data.archive_file.youtube_thumbnails_generate_cropouts_zip.output_path
+  depends_on = [data.archive_file.youtube_thumbnails_generate_cropouts_zip]
+}
 
 resource "google_storage_bucket_object" "categories_lookup" {
-  name       = "categories_lookup.csv"
-  bucket     = google_storage_bucket.categories_lookup.name
-  source     = "../src/categories_lookup.csv"
-  content_type = "text/plain"
+  name          = "categories_lookup.csv"
+  bucket        = google_storage_bucket.categories_lookup.name
+  source        = "../src/categories_lookup.csv"
+  content_type  = "text/plain"
 }
 
 resource "google_cloudfunctions_function" "google_ads_accounts_function" {
@@ -124,9 +135,9 @@ resource "google_cloudfunctions_function" "google_ads_accounts_function" {
   trigger_http          = true
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT                      = var.project_id
-    CROP_AND_STORE_OBJECTS                    = var.crop_and_store_objects
-    VID_EXCL_ADS_ACCOUNT_PUBSUB_TOPIC      = google_pubsub_topic.google_ads_account_topic.name
+    GOOGLE_CLOUD_PROJECT              = var.project_id
+    CROP_AND_STORE_OBJECTS            = var.crop_and_store_objects
+    VID_EXCL_ADS_ACCOUNT_PUBSUB_TOPIC = google_pubsub_topic.google_ads_account_topic.name
   }
 }
 
@@ -149,10 +160,10 @@ resource "google_cloudfunctions_function" "google_ads_exclusions_function" {
   }
 
   environment_variables = {
-    GOOGLE_ADS_USE_PROTO_PLUS       = false
-    GOOGLE_ADS_LOGIN_CUSTOMER_ID    = var.google_ads_login_customer_id
-    GOOGLE_CLOUD_PROJECT            = var.project_id
-    VID_EXCL_GCS_DATA_BUCKET        = google_storage_bucket.video_exclusion_data_bucket.name
+    GOOGLE_ADS_USE_PROTO_PLUS     = false
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID  = var.google_ads_login_customer_id
+    GOOGLE_CLOUD_PROJECT          = var.project_id
+    VID_EXCL_GCS_DATA_BUCKET      = google_storage_bucket.video_exclusion_data_bucket.name
   }
 
   secret_environment_variables {
@@ -246,7 +257,7 @@ resource "google_cloudfunctions_function" "google_ads_report_channel_function" {
   }
 
   environment_variables = {
-    GOOGLE_ADS_USE_PROTO_PLUS            = false
+    GOOGLE_ADS_USE_PROTO_PLUS             = false
     GOOGLE_ADS_LOGIN_CUSTOMER_ID          = var.google_ads_login_customer_id
     GOOGLE_CLOUD_PROJECT                  = var.project_id
     VID_EXCL_GCS_DATA_BUCKET              = google_storage_bucket.video_exclusion_data_bucket.name
@@ -295,9 +306,9 @@ resource "google_cloudfunctions_function" "youtube_channel_function" {
   }
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT                = var.project_id
-    VID_EXCL_BIGQUERY_DATASET           = google_bigquery_dataset.dataset.dataset_id
-    VID_EXCL_GCS_DATA_BUCKET            = google_storage_bucket.video_exclusion_data_bucket.name
+    GOOGLE_CLOUD_PROJECT      = var.project_id
+    VID_EXCL_BIGQUERY_DATASET = google_bigquery_dataset.dataset.dataset_id
+    VID_EXCL_GCS_DATA_BUCKET  = google_storage_bucket.video_exclusion_data_bucket.name
   }
 }
 
@@ -320,9 +331,9 @@ resource "google_cloudfunctions_function" "youtube_video_function" {
   }
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT                = var.project_id
-    VID_EXCL_BIGQUERY_DATASET           = google_bigquery_dataset.dataset.dataset_id
-    VID_EXCL_GCS_DATA_BUCKET            = google_storage_bucket.video_exclusion_data_bucket.name
+    GOOGLE_CLOUD_PROJECT      = var.project_id
+    VID_EXCL_BIGQUERY_DATASET = google_bigquery_dataset.dataset.dataset_id
+    VID_EXCL_GCS_DATA_BUCKET  = google_storage_bucket.video_exclusion_data_bucket.name
   }
 }
 
@@ -356,7 +367,7 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_dispatch_function"
 resource "google_cloudfunctions_function" "youtube_thumbnails_process_function" {
   region                = var.region
   name                  = "vid-excl-youtube_thumbnails_process"
-  description           = "Pull the YouTube video thumbnails and crop them."
+  description           = "Identify objects and labels in a thumbnail."
   runtime               = "python311"
   source_archive_bucket = google_storage_bucket.function_bucket.name
   source_archive_object = google_storage_bucket_object.youtube_thumbnails_process.name
@@ -371,9 +382,34 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_process_function" 
   }
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT                      = var.project_id
-    VID_EXCL_CROP_AND_STORE_OBJECTS           = var.crop_and_store_objects
-    VID_EXCL_BIGQUERY_DATASET                 = google_bigquery_dataset.dataset.dataset_id
-    VID_EXCL_THUMBNAIL_CROP_BUCKET            = google_storage_bucket.thumbnail_cropouts_bucket.name
+    GOOGLE_CLOUD_PROJECT                            = var.project_id
+    VID_EXCL_CROP_AND_STORE_OBJECTS                 = var.crop_and_store_objects
+    VID_EXCL_BIGQUERY_DATASET                       = google_bigquery_dataset.dataset.dataset_id
+    VID_EXCL_THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC  = google_pubsub_topic.youtube_thumbnails_to_generate_cropouts_pubsub_topic.name
+  }
+}
+
+
+resource "google_cloudfunctions_function" "youtube_thumbnails_generate_cropouts_function" {
+  region                = var.region
+  name                  = "vid-excl-youtube_thumbnails_generate_cropouts"
+  description           = "Crop objects from video thumbnails."
+  runtime               = "python311"
+  source_archive_bucket = google_storage_bucket.function_bucket.name
+  source_archive_object = google_storage_bucket_object.youtube_thumbnails_generate_cropouts.name
+  service_account_email = google_service_account.service_account.email
+  timeout               = 540
+  available_memory_mb   = 1024
+  entry_point           = "main"
+
+  event_trigger {
+    event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
+    resource   = google_pubsub_topic.youtube_thumbnails_to_generate_cropouts_pubsub_topic.name
+  }
+
+  environment_variables = {
+    GOOGLE_CLOUD_PROJECT            = var.project_id
+    VID_EXCL_BIGQUERY_DATASET       = google_bigquery_dataset.dataset.dataset_id
+    VID_EXCL_THUMBNAIL_CROP_BUCKET  = google_storage_bucket.thumbnail_cropouts_bucket.name
   }
 }
