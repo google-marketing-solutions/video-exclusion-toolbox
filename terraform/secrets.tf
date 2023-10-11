@@ -15,25 +15,25 @@
 resource "google_secret_manager_secret" "oauth_refresh_token_secret" {
   secret_id = "vid-excl-oauth-refresh-token-secret"
   replication {
-    automatic = true
+    auto {}
   }
 }
 resource "google_secret_manager_secret" "client_id_secret" {
   secret_id = "vid-excl-client-id-secret"
   replication {
-    automatic = true
+    auto {}
   }
 }
 resource "google_secret_manager_secret" "client_secret_secret" {
   secret_id = "vid-excl-client-secret-secret"
   replication {
-    automatic = true
+    auto {}
   }
 }
 resource "google_secret_manager_secret" "developer_token_secret" {
   secret_id = "vid-excl-developer-token-secret"
   replication {
-    automatic = true
+    auto {}
   }
 }
 
