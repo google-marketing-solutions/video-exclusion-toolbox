@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# CLOUD STORAGE ----------------------------------------------------------------
-resource "google_storage_bucket" "video_exclusion_data_bucket" {
-  name                        = "${var.project_id}-vid-excl-data"
+resource "google_storage_bucket" "video_exclusion_toolbox_data" {
+  name                        = "${var.project_id}-data"
   location                    = var.region
   force_destroy               = true
   uniform_bucket_level_access = true
 }
 
 
-# This bucket is used to store the cloud functions for deployment.
-# The project ID is used to make sure the name is globally unique
-resource "google_storage_bucket" "function_bucket" {
-  name                        = "${var.project_id}-functions"
+resource "google_storage_bucket" "source_archive" {
+  name                        = "${var.project_id}-source-archive"
   location                    = var.region
   force_destroy               = true
   uniform_bucket_level_access = true
@@ -48,9 +45,7 @@ resource "google_storage_bucket" "categories_lookup" {
 }
 
 
-# This bucket is used to store the cloud functions for deployment.
-# The project ID is used to make sure the name is globally unique
-resource "google_storage_bucket" "thumbnail_cropouts_bucket" {
+resource "google_storage_bucket" "thumbnail_cropouts" {
   name                        = "${var.project_id}-thumbnail-cropouts"
   location                    = var.region
   force_destroy               = true

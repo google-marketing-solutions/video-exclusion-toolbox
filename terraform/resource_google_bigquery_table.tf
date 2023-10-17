@@ -12,46 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# DATASET ----------------------------------------------------------------------
-resource "google_bigquery_dataset" "dataset" {
-  dataset_id                 = var.bq_dataset
-  location                   = var.region
-  description                = "Video Exclusion Toolbox BQ Dataset"
-  delete_contents_on_destroy = true
-}
-
-# TABLES -----------------------------------------------------------------------
-resource "google_bigquery_table" "youtube_category_lookup_table" {
-  dataset_id = google_bigquery_dataset.dataset.dataset_id
+resource "google_bigquery_table" "youtube_category_lookup" {
+  dataset_id = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   project    = "${var.project_id}"
   deletion_protection = false
   depends_on = [
-    resource.google_bigquery_dataset.dataset,
+    resource.google_bigquery_dataset.video_exclusion_toolbox,
     resource.google_storage_bucket_object.categories_lookup
   ]
   external_data_configuration {
     autodetect = true
-
     source_format = "CSV"
     source_uris = [
       "gs://${google_storage_bucket.categories_lookup.name}/categories_lookup.csv"
     ]
   }
-
   table_id = "YouTubeCategory"
 }
 
-resource "google_bigquery_table" "google_ads_report_video_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
+resource "google_bigquery_table" "google_ads_report_video" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "GoogleAdsReportVideo"
   deletion_protection = false
-  depends_on = [google_bigquery_dataset.dataset]
-
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   external_data_configuration {
     autodetect    = false
     source_format = "CSV"
     source_uris = [
-      "gs://${google_storage_bucket.video_exclusion_data_bucket.name}/google_ads_report_video/*.csv"
+      "gs://${google_storage_bucket.video_exclusion_toolbox_data.name}/google_ads_report_video/*.csv"
     ]
     schema = file("../bq_schemas/google_ads_report_video.json")
     csv_options {
@@ -60,17 +49,18 @@ resource "google_bigquery_table" "google_ads_report_video_table" {
     }
   }
 }
-resource "google_bigquery_table" "google_ads_exclusions_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
+
+resource "google_bigquery_table" "google_ads_exclusions" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "GoogleAdsExclusions"
   deletion_protection = false
-  depends_on = [google_bigquery_dataset.dataset]
-
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   external_data_configuration {
     autodetect    = false
     source_format = "CSV"
     source_uris = [
-      "gs://${google_storage_bucket.video_exclusion_data_bucket.name}/google_ads_exclusions/*.csv"
+      "gs://${google_storage_bucket.video_exclusion_toolbox_data.name}/google_ads_exclusions/*.csv"
     ]
     schema = file("../bq_schemas/google_ads_exclusions.json")
     csv_options {
@@ -79,17 +69,18 @@ resource "google_bigquery_table" "google_ads_exclusions_table" {
     }
   }
 }
-resource "google_bigquery_table" "google_ads_report_channel_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
+
+resource "google_bigquery_table" "google_ads_report_channel" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "GoogleAdsReportChannel"
   deletion_protection = false
-  depends_on = [google_bigquery_dataset.dataset]
-
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   external_data_configuration {
     autodetect    = false
     source_format = "CSV"
     source_uris = [
-      "gs://${google_storage_bucket.video_exclusion_data_bucket.name}/google_ads_report_channel/*.csv"
+      "gs://${google_storage_bucket.video_exclusion_toolbox_data.name}/google_ads_report_channel/*.csv"
     ]
     schema = file("../bq_schemas/google_ads_report_channel.json")
     csv_options {
@@ -99,40 +90,51 @@ resource "google_bigquery_table" "google_ads_report_channel_table" {
   }
 }
 
-resource "google_bigquery_table" "youtube_channel_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
+resource "google_bigquery_table" "youtube_channel" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeChannel"
   deletion_protection = false
-  depends_on = [google_bigquery_dataset.dataset]
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_channel.json")
 }
 
-resource "google_bigquery_table" "youtube_video_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
+resource "google_bigquery_table" "youtube_video" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeVideo"
   deletion_protection = false
-  depends_on = [google_bigquery_dataset.dataset]
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_video.json")
 }
 
-resource "google_bigquery_table" "youtube_thubmnails_table" {
-  dataset_id          = google_bigquery_dataset.dataset.dataset_id
+resource "google_bigquery_table" "youtube_thubmnails" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeThumbnailsWithAnnotations"
   deletion_protection = false
-  depends_on = [google_bigquery_dataset.dataset]
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_thumbnail_annotation.json")
 }
 
-# VIEWS ------------------------------------------------------------------------
-resource "google_bigquery_table" "ads_and_youtube_view" {
-  table_id   = "AdsAndYouTube"
-  dataset_id = google_bigquery_dataset.dataset.dataset_id
+resource "google_bigquery_table" "youtube_thubmnail_cropouts" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "YouTubeThumbnailCropouts"
+  deletion_protection = false
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  schema              = file("../bq_schemas/youtube_thumbnail_cropout.json")
+}
+
+resource "google_bigquery_table" "ads_and_youtube" {
   project    = "${var.project_id}"
+  table_id   = "AdsAndYouTube"
+  dataset_id = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
   depends_on = [
-    google_bigquery_dataset.dataset,
-    google_bigquery_table.google_ads_report_video_aggregated_view,
-    google_bigquery_table.youtube_video_table
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.google_ads_report_video_aggregated,
+    google_bigquery_table.youtube_video
   ]
 
   view {
@@ -175,17 +177,17 @@ resource "google_bigquery_table" "ads_and_youtube_view" {
   }
 }
 
-resource "google_bigquery_table" "ads_and_youtube_and_channels_view" {
-  table_id   = "AdsAndYoutubeAndChannels"
-  dataset_id = google_bigquery_dataset.dataset.dataset_id
+resource "google_bigquery_table" "ads_and_youtube_and_channels" {
   project    = "${var.project_id}"
+  table_id   = "AdsAndYoutubeAndChannels"
+  dataset_id = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
   depends_on = [
-    google_bigquery_dataset.dataset,
-    google_bigquery_table.google_ads_report_video_aggregated_view,
-    google_bigquery_table.youtube_video_table,
-    google_bigquery_table.youtube_channel_table,
-    google_bigquery_table.youtube_category_lookup_table
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.google_ads_report_video_aggregated,
+    google_bigquery_table.youtube_video,
+    google_bigquery_table.youtube_channel,
+    google_bigquery_table.youtube_category_lookup
   ]
   view {
     query =  <<-EOT
@@ -240,14 +242,14 @@ resource "google_bigquery_table" "ads_and_youtube_and_channels_view" {
   }
 }
 
-resource "google_bigquery_table" "google_ads_report_video_aggregated_view" {
-  table_id   = "GoogleAdsReportVideoAggregated"
-  dataset_id = "${var.bq_dataset}"
+resource "google_bigquery_table" "google_ads_report_video_aggregated" {
   project    = "${var.project_id}"
+  table_id   = "GoogleAdsReportVideoAggregated"
+  dataset_id = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
   depends_on = [
-    google_bigquery_dataset.dataset,
-    google_bigquery_table.google_ads_report_video_table
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.google_ads_report_video
   ]
   view {
     query =  <<-EOT

@@ -13,27 +13,27 @@
 # limitations under the License.
 
 # PUB/SUB ----------------------------------------------------------------------
-resource "google_pubsub_topic" "google_ads_account_topic" {
-  name                       = "vid-excl-google-ads-account-topic"
+resource "google_pubsub_topic" "google_ads_account" {
+  name                       = "vid-excl-google-ads-account"
   message_retention_duration = "604800s"
 }
 
-resource "google_pubsub_topic" "youtube_video_pubsub_topic" {
-  name                       = "vid-excl-youtube-video-topic"
+resource "google_pubsub_topic" "youtube_video" {
+  name                       = "vid-excl-youtube-video"
   message_retention_duration = "604800s"
 }
 
-resource "google_pubsub_topic" "youtube_channel_pubsub_topic" {
-  name                       = "vid-excl-youtube-channel-topic"
+resource "google_pubsub_topic" "youtube_channel" {
+  name                       = "vid-excl-youtube-channel"
   message_retention_duration = "604800s"
 }
 
-resource "google_pubsub_topic" "youtube_thumbnails_to_process_pubsub_topic" {
-  name                       = "vid-excl-youtube-thumbnails-to-process-topic"
+resource "google_pubsub_topic" "youtube_thumbnails_to_process" {
+  name                       = "vid-excl-youtube-thumbnails-to-process"
   message_retention_duration = "604800s"
 }
 
-resource "google_pubsub_topic" "youtube_thumbnails_to_generate_cropouts_pubsub_topic" {
-  name                       = "vid-excl-youtube-thumbnails-to-generate-cropouts-topic"
+resource "google_pubsub_topic" "youtube_thumbnails_to_generate_cropouts" {
+  name                       = "vid-excl-youtube-thumbnails-to-generate-cropouts"
   message_retention_duration = "604800s"
 }
