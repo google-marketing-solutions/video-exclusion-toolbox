@@ -261,18 +261,26 @@ def get_youtube_videos_dataframe(
 
 
 def sanitise_youtube_dataframe(youtube_df: pd.DataFrame) -> pd.DataFrame:
-  """Takes the dataframe from YouTube and sanitises it to write as a CSV.
+  """Takes the dataframe from YouTube and sanitises it to write to BigQuery.
 
   Args:
       youtube_df: The dataframe containing the YouTube data.
 
   Returns:
-      The YouTube dataframe but sanitised to be safe to write to a CSV.
+      The YouTube dataframe but sanitised to be safe to write to BigQuery.
   """
-  youtube_df['viewCount'] = youtube_df['viewCount'].fillna(0)
-  youtube_df['likeCount'] = youtube_df['likeCount'].fillna(0)
-  youtube_df['commentCount'] = youtube_df['commentCount'].fillna(0)
-  youtube_df['categoryId'] = youtube_df['categoryId'].fillna(0)
+  youtube_df['viewCount'] = pd.to_numeric(
+      youtube_df['viewCount'], errors='coerce'
+  ).fillna(0)
+  youtube_df['likeCount'] = pd.to_numeric(
+      youtube_df['likeCount'], errors='coerce'
+  ).fillna(0)
+  youtube_df['commentCount'] = pd.to_numeric(
+      youtube_df['commentCount'], errors='coerce'
+  ).fillna(0)
+  youtube_df['categoryId'] = pd.to_numeric(
+      youtube_df['categoryId'], errors='coerce'
+  ).fillna(0)
   youtube_df['publishedAt'] = pd.to_datetime(
       youtube_df['publishedAt'], errors='coerce'
   )
