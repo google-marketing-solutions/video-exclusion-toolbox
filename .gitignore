@@ -40,3 +40,10 @@ creds.json
 
 # OS
 .DS_STORE
+
+.gitignore
+GTECH
+METADATA
+OWNERS
+copy.bara.sky
+src/*/trigger.py
