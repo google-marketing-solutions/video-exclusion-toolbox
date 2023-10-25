@@ -1,0 +1,50 @@
+[
+  {
+    "name": "video_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The YouTube Video ID."
+  },
+  {
+    "name": "thumbnail_url",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The URL of the thumbnail."
+  },
+  {
+      "name": "label",
+      "type": "STRING",
+      "mode": "REQUIRED",
+      "description": "The label of the detected object."
+  },
+  {
+      "name": "confidence",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "The confidence of the detected object."
+  },
+  {
+      "name": "file_name",
+      "type": "STRING",
+      "mode": "REQUIRED",
+      "description": "The name of the file in Google Storage."
+  },
+  {
+      "name": "gs_file_path",
+      "type": "STRING",
+      "mode": "REQUIRED",
+      "description": "The path to the file in Google Storage."
+  },
+  {
+      "name": "fuse_file_path",
+      "type": "STRING",
+      "mode": "REQUIRED",
+      "description": "The path to the file in GCS in Fuse format."
+  },
+  {
+    "name": "datetime_updated",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "The datetime when the thumbnail was analyzed by Vision API."
+  }
+]

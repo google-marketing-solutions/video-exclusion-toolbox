@@ -22,7 +22,7 @@ output "A_service_account_email" {
       Grant Sheet access to the service account below:
       
       --------------------------------------------------------------------------
-      ${google_service_account.service_account.email}
+      ${google_service_account.video_exclusion_toolbox.email}
       --------------------------------------------------------------------------
 
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -64,6 +64,21 @@ output "C_looker_studio_url" {
       --------------------------------------------------------------------------
       https://lookerstudio.google.com/reporting/create?c.reportId=${var.looker_studio_template}&r.reportName=Video%20Exclusion%20Toolbox&ds.youtube_channel.datasourceName=YouTubeChannel&ds.youtube_channel.connector=bigQuery&ds.youtube_channel.type=TABLE&ds.youtube_channel.projectId=${var.project_id}&ds.youtube_channel.datasetId=${var.bq_dataset}&ds.youtube_channel.tableId=YouTubeChannel&ds.ads_and_channels.datasourceName=AdsAndChannels&ds.ads_and_channels.connector=bigQuery&ds.ads_and_channels.type=TABLE&ds.ads_and_channels.projectId=${var.project_id}&ds.ads_and_channels.datasetId=${var.bq_dataset}&ds.ads_and_channels.tableId=AdsAndYoutubeAndChannels&ds.ads_and_youtube.datasourceName=AdsAndYoutube&ds.ads_and_youtube.connector=bigQuery&ds.ads_and_youtube.type=TABLE&ds.ads_and_youtube.projectId=${var.project_id}&ds.ads_and_youtube.datasetId=${var.bq_dataset}&ds.ads_and_youtube.tableId=AdsAndYouTube
       --------------------------------------------------------------------------
+
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      ⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻
+    EOT
+}
+
+output "D_scroll_up" {
+  value = <<-EOT
+
+
+
+      __________________________________________________________________________
+      ˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅˅
+
+      Please scroll up to Step 1 and start there.
 
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       ⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻

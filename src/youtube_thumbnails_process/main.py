@@ -16,18 +16,16 @@
 
 import base64
 import datetime
-import io
 import json
 import logging
 import os
 import sys
 from typing import Any
-import uuid
 
 import google.auth
 import google.auth.credentials
 from google.cloud import bigquery
-from google.cloud import storage
+from google.cloud import pubsub_v1
 from google.cloud import vision
 import jsonschema
 import pandas as pd
@@ -38,19 +36,21 @@ logging.basicConfig(stream=sys.stdout)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# The Google Cloud project containing the pub/sub topic
+GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
+# The name of the BigQuery Dataset.
+BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
+# The topic to send video_ids to to have objects cropped from them.
+THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC = os.environ.get(
+    'VID_EXCL_THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC'
+)
+
 # Selector of what labels of objects will be cropped out.
 # For age recognition, 'Face' and 'Person' are recommended.
 OBJECTS_TO_CROP_AND_STORE = ['Face', 'Person']
 # BQ Table name to store the detected object's metadata. This is not expexted
 # to be configurable and so is not exposed as an environmental variable
 BQ_TABLE_NAME = 'YouTubeThumbnailsWithAnnotations'
-
-# The Google Cloud project containing the pub/sub topic
-GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
-# The name of the BigQuery Dataset.
-BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
-# The bucket to write the thumbnails to.
-THUMBNAIL_CROP_BUCKET = os.environ.get('VID_EXCL_THUMBNAIL_CROP_BUCKET')
 # Switch whether to store cropped thumbnail objecs in GCS.
 CROP_AND_STORE_OBJECTS = os.environ.get(
     'VID_EXCL_CROP_AND_STORE_OBJECTS', 'False'
@@ -65,7 +65,6 @@ IMAGE_FEATURE_TYPES = [
     {'type_': vision.Feature.Type.OBJECT_LOCALIZATION},
     {'type_': vision.Feature.Type.LABEL_DETECTION},
 ]
-
 THUMBNAIL_RESOLUTIONS = (
     (
         'maxresdefault',
@@ -195,39 +194,15 @@ def _process_video(video_id: str) -> None:
   )
 
   if CROP_AND_STORE_OBJECTS:
-    filtered_objects = extracted_data[
-        extracted_data['label'].isin(OBJECTS_TO_CROP_AND_STORE)
-    ]
-
-    logger.info(
-        'Filtered %d object(s) to be cropped from thumbnails and stored in'
-        ' GCS.',
-        len(filtered_objects.index),
-    )
-
-    cropouts = {}
-    for url in thumbnails:
-      cropouts = cropouts | _generate_cropouts_from_image(
-          thumbnails[url],
-          filtered_objects[filtered_objects['thumbnail_url'] == url],
-      )
-
-    client = storage.Client()
-    for image_name in cropouts.keys():
-      _save_image_to_gcs(
-          client=client,
-          image=cropouts[image_name],
-          image_name=image_name,
-          bucket_name=THUMBNAIL_CROP_BUCKET,
-      )
-    logger.info(
-        '%d object(s) stored in GCS.',
-        len(cropouts.keys()),
+    _send_video_for_processing(
+        video_id=video_id,
+        topic=THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC,
+        gcp_project=GOOGLE_CLOUD_PROJECT,
     )
 
 
 def _extract_features_df_from_image_uri(image_uri: str) -> pd.DataFrame:
-  """Extract features from a single thumbnail url.
+  """Extracts features from a single thumbnail url.
 
   Args:
     image_uri: The location of the thumbnail.
@@ -256,147 +231,15 @@ def _extract_features_df_from_image_uri(image_uri: str) -> pd.DataFrame:
   return pd.DataFrame(faces + objects + labels)
 
 
-def _generate_cropouts_from_image(
-    thumbnail: PIL.Image.Image, cropout_data: pd.DataFrame
-) -> dict[PIL.Image.Image | None]:
-  """Generate cropouts from an image.
-
-  Args:
-    thumbnail: An image from which to crop out features.
-    cropout_data: A dataframe with coordinates of each cropout.
-
-  Returns:
-    A dictionary with image name as keys, cropped image objects as values.
-    Returns an empty dictionary if the cropout_data input is an empty dataframe.
-  """
-  cropped_images = {}
-
-  if not cropout_data.empty:
-    for _, row in cropout_data.iterrows():
-      cropped_image = _cropout_from_image(
-          image=thumbnail,
-          top_left_x=float(row['top_left_x']),
-          top_left_y=float(row['top_left_y']),
-          bottom_right_x=float(row['bottom_right_x']),
-          bottom_right_y=float(row['bottom_right_y']),
-      )
-      image_name = _generate_thumbnail_name(
-          video_id=row['video_id'],
-          video_url=row['thumbnail_url'],
-          label=row['label'],
-      )
-      cropped_images[image_name] = cropped_image
-
-    logger.info(
-        'Generated %d crop-out(s) from thumbnail %s.',
-        len(cropped_images),
-        cropout_data['thumbnail_url'].iloc[0],
-    )
-  else:
-    logger.info('Nothing to crop.')
-
-  return cropped_images
-
-
-def _generate_thumbnail_name(video_id: str, video_url: str, label: str) -> str:
-  """Generate a sanitized file name for a GCS blob.
-
-  Args:
-    video_id: YouTube video ID, acts as a GCP folder.
-    video_url: YouTube Video url.
-    label: Object label.
-
-  Returns:
-    New object name for GCS in format:
-    {video_id}/{label}-{random-UUID}-{sanitized video_id}.
-  """
-  sanitized_url = video_url
-  for ch in CHARS_TO_REPLACE_IN_IMAGE_NAME:
-    sanitized_url = sanitized_url.replace(ch, '_')
-  # The "_" is for conciseness and readability purposes only, there's no
-  # technical requirement, and so a simplictic replacement is sufficient.
-  sanitized_url = sanitized_url.replace('___', '_').replace('__', '_')
-  return f'{video_id}/{label}-{str(uuid.uuid4())[-6:]}-{sanitized_url}'
-
-
-def _save_image_to_gcs(
-    client: storage.Client, image: PIL.Image, image_name: str, bucket_name: str
-) -> None:
-  """Uploads an image object to a GCS bucket.
-
-  Args:
-    client: An initialized GCS client.
-    image: Image object.
-    image_name: Name of the object to be created as.
-    bucket_name: Name oth the GCS bucket for the object to be created in.
-
-  """
-  bucket = client.bucket(bucket_name)
-  img_byte_array = io.BytesIO()
-  image.save(img_byte_array, format='JPEG')
-  image_blob = bucket.blob(image_name)
-  image_blob.upload_from_string(
-      img_byte_array.getvalue(), content_type='image/jpeg'
-  )
-  logger.debug('Saved image %s to %s', image_name, bucket_name)
-
-
-def _cropout_from_image(
-    image: PIL.Image.Image,
-    top_left_x: float,
-    top_left_y: float,
-    bottom_right_x: float,
-    bottom_right_y: float,
-) -> PIL.Image.Image:
-  """Crop an image based on Top Left and Bottom Right coordinates.
-
-  Accepts relative and absolute coordinates.
-  If all coordinates are <1, the function assumes these are relative coordinates
-  and converts them to absolute values.
-  If the Bottom Right coordinates are 0, the function returns the full image.
-
-  Args:
-      image: The original image to crop a cutout from.
-      top_left_x: The x-coordinate of the top-left corner of the crop
-        rectangle.
-      top_left_y: The y-coordinate of the top-left corner of the crop
-        rectangle.
-      bottom_right_x: The x-coordinate of the bottom-right corner of the
-        crop rectangle.
-      bottom_right_y: The y-coordinate of the bottom-right corner of the
-        crop rectangle.
-
-  Returns:
-      Image: The cropped image.
-  """
-
-  width = image.width
-  height = image.height
-
-  if bottom_right_x == 0 and bottom_right_y == 0:
-    return image
-
-  if (top_left_x <= 1 and top_left_y <= 1 and bottom_right_x <= 1 and
-      bottom_right_y <= 1):
-    top_left_x = top_left_x * width
-    top_left_y = top_left_y * height
-    bottom_right_x = bottom_right_x * width
-    bottom_right_y = bottom_right_y * height
-
-  return image.crop(
-      (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
-  )
-
-
 def _get_auth_credentials() -> google.auth.credentials.Credentials:
-  """Return credentials for Google APIs."""
+  """Returns credentials for Google APIs."""
   credentials, _ = google.auth.default()
   return credentials
 
 
 def _parse_vision_object_annotations(
     vision_object: vision.LocalizedObjectAnnotation) -> dict[str]:
-  """Get labels from the Google Vision API for an image at the given URL.
+  """Gets labels from the Google Vision API for an image at the given URL.
 
   Args:
       vision_object: An object from the Vision API.
@@ -417,7 +260,7 @@ def _parse_vision_object_annotations(
 
 
 def _parse_face_annotations(vision_object: vision.FaceAnnotation) -> dict[str]:
-  """Get labels from the Google Vision API from a face annotation object.
+  """Gets labels from the Google Vision API from a face annotation object.
 
   Args:
       vision_object: An object from the Vision API.
@@ -440,7 +283,7 @@ def _parse_face_annotations(vision_object: vision.FaceAnnotation) -> dict[str]:
 def _parse_label_annotations(
     vision_object: vision.EntityAnnotation,
 ) -> dict[str]:
-  """Get labels from the Google Vision API from a label annotation object.
+  """Gets labels from the Google Vision API from a label annotation object.
 
   Args:
       vision_object: An object from the Vision API.
@@ -463,7 +306,7 @@ def _parse_label_annotations(
 def _get_best_resolution_thumbnails(
     video_id: str,
 ) -> dict[PIL.Image.Image | None]:
-  """Retrieve the best resolution of each video's thumbnails.
+  """Retrieves the best resolution of each video's thumbnails.
 
   Args:
       video_id: The id of YouTube video.
@@ -492,7 +335,7 @@ def _get_best_resolution_thumbnails(
 
 
 def _write_results_to_bq(data: pd.DataFrame, table_id: str) -> None:
-  """Write the YouTube dataframe to BQ.
+  """Writes the YouTube dataframe to BQ.
 
   Args:
       data: The dataframe based on the YouTube data.
@@ -515,3 +358,26 @@ def _write_results_to_bq(data: pd.DataFrame, table_id: str) -> None:
       logger.error('Encountered errors while inserting rows: %s', errors)
   else:
     logger.info('Nothing to write to BQ.')
+
+
+def _send_video_for_processing(
+    video_id: str, topic: str, gcp_project: str
+) -> None:
+  """Pushes the dictionary to pubsub.
+
+  Args:
+      video_id: The viseo ID to push to pubsub.
+      topic: The name of the topic to publish the message to.
+      gcp_project: The Google Cloud Project with the pub/sub topic in.
+  """
+  publisher = pubsub_v1.PublisherClient()
+  topic_path = publisher.topic_path(gcp_project, topic)
+  message_str = json.dumps({'video_id': video_id})
+  # Data must be a bytestring
+  data = message_str.encode('utf-8')
+  publisher.publish(topic_path, data)
+  logger.info(
+      'Video %s dispatched for thumbnail processing to %s.',
+      video_id,
+      topic_path,
+  )
