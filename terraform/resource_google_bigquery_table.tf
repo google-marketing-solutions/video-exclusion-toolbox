@@ -13,15 +13,15 @@
 # limitations under the License.
 
 resource "google_bigquery_table" "youtube_category_lookup" {
-  dataset_id = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  project    = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  project             = "${var.project_id}"
   deletion_protection = false
   depends_on = [
     resource.google_bigquery_dataset.video_exclusion_toolbox,
     resource.google_storage_bucket_object.categories_lookup
   ]
   external_data_configuration {
-    autodetect = true
+    autodetect    = true
     source_format = "CSV"
     source_uris = [
       "gs://${google_storage_bucket.categories_lookup.name}/categories_lookup.csv"
@@ -126,10 +126,30 @@ resource "google_bigquery_table" "youtube_thubmnail_cropouts" {
   schema              = file("../bq_schemas/youtube_thumbnail_cropout.json")
 }
 
+resource "google_bigquery_table" "exclusion_criteria" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "ExclusionCriteria"
+  deletion_protection = false
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  external_data_configuration {
+    autodetect    = false
+    source_format = "GOOGLE_SHEETS"
+    source_uris = [
+      "https://docs.google.com/spreadsheets/d/${var.config_sheet_id}"
+    ]
+    schema = file("../bq_schemas/exclusion_criteria.json")
+    google_sheets_options {
+      range             = "ExclusionCriteria!A:A"
+      skip_leading_rows = "1"
+    }
+  }
+}
+
 resource "google_bigquery_table" "ads_and_youtube" {
-  project    = "${var.project_id}"
-  table_id   = "AdsAndYouTube"
-  dataset_id = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  project             = "${var.project_id}"
+  table_id            = "AdsAndYouTube"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
@@ -138,7 +158,7 @@ resource "google_bigquery_table" "ads_and_youtube" {
   ]
 
   view {
-    query =  <<-EOT
+    query          = <<-EOT
       SELECT
         Ads.first_seen,
         Ads.last_seen,
@@ -178,9 +198,9 @@ resource "google_bigquery_table" "ads_and_youtube" {
 }
 
 resource "google_bigquery_table" "ads_and_youtube_and_channels" {
-  project    = "${var.project_id}"
-  table_id   = "AdsAndYoutubeAndChannels"
-  dataset_id = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  project             = "${var.project_id}"
+  table_id            = "AdsAndYoutubeAndChannels"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
@@ -190,7 +210,7 @@ resource "google_bigquery_table" "ads_and_youtube_and_channels" {
     google_bigquery_table.youtube_category_lookup
   ]
   view {
-    query =  <<-EOT
+    query          = <<-EOT
       SELECT
         Ads.first_seen,
         Ads.last_seen,
@@ -243,16 +263,16 @@ resource "google_bigquery_table" "ads_and_youtube_and_channels" {
 }
 
 resource "google_bigquery_table" "google_ads_report_video_aggregated" {
-  project    = "${var.project_id}"
-  table_id   = "GoogleAdsReportVideoAggregated"
-  dataset_id = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  project             = "${var.project_id}"
+  table_id            = "GoogleAdsReportVideoAggregated"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
     google_bigquery_table.google_ads_report_video
   ]
   view {
-    query =  <<-EOT
+    query          = <<-EOT
       SELECT
         customer_id,
         video_id,
