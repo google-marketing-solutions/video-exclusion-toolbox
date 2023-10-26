@@ -35,7 +35,7 @@ BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 
 
-def run(request: str) -> str:
+def main(request: str) -> str:
   """Starts the job to upload exclusions to Google Ads.
 
   Args:

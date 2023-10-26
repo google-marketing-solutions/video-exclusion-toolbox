@@ -50,10 +50,10 @@ resource "google_cloudfunctions_function" "google_ads_exclusions" {
   }
 
   environment_variables = {
-    GOOGLE_ADS_USE_PROTO_PLUS     = false
-    GOOGLE_ADS_LOGIN_CUSTOMER_ID  = var.google_ads_login_customer_id
-    GOOGLE_CLOUD_PROJECT          = var.project_id
-    VID_EXCL_GCS_DATA_BUCKET      = google_storage_bucket.video_exclusion_toolbox_data.name
+    GOOGLE_ADS_USE_PROTO_PLUS    = false
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID = var.google_ads_login_customer_id
+    GOOGLE_CLOUD_PROJECT         = var.project_id
+    VID_EXCL_GCS_DATA_BUCKET     = google_storage_bucket.video_exclusion_toolbox_data.name
   }
 
   secret_environment_variables {
@@ -272,10 +272,10 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_process" {
   }
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT                            = var.project_id
-    VID_EXCL_CROP_AND_STORE_OBJECTS                 = var.crop_and_store_objects
-    VID_EXCL_BIGQUERY_DATASET                       = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-    VID_EXCL_THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC  = google_pubsub_topic.youtube_thumbnails_to_generate_cropouts.name
+    GOOGLE_CLOUD_PROJECT                           = var.project_id
+    VID_EXCL_CROP_AND_STORE_OBJECTS                = var.crop_and_store_objects
+    VID_EXCL_BIGQUERY_DATASET                      = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+    VID_EXCL_THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC = google_pubsub_topic.youtube_thumbnails_to_generate_cropouts.name
   }
 }
 
@@ -298,8 +298,51 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_generate_cropouts"
   }
 
   environment_variables = {
-    GOOGLE_CLOUD_PROJECT            = var.project_id
-    VID_EXCL_BIGQUERY_DATASET       = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-    VID_EXCL_THUMBNAIL_CROP_BUCKET  = google_storage_bucket.thumbnail_cropouts.name
+    GOOGLE_CLOUD_PROJECT           = var.project_id
+    VID_EXCL_BIGQUERY_DATASET      = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+    VID_EXCL_THUMBNAIL_CROP_BUCKET = google_storage_bucket.thumbnail_cropouts.name
+  }
+}
+
+resource "google_cloudfunctions_function" "google_ads_excluder" {
+  region                = var.region
+  name                  = "vid-excl-google_ads_excluder"
+  description           = "Upload a list of videos/channels to exclude to a given account/exclusion list."
+  runtime               = "python311"
+  source_archive_bucket = google_storage_bucket.source_archive.name
+  source_archive_object = google_storage_bucket_object.google_ads_excluder.name
+  service_account_email = google_service_account.video_exclusion_toolbox.email
+  timeout               = 540
+  available_memory_mb   = 4096
+  entry_point           = "main"
+  trigger_http          = true
+
+  environment_variables = {
+    GOOGLE_ADS_USE_PROTO_PLUS    = false
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID = var.google_ads_login_customer_id
+    GOOGLE_CLOUD_PROJECT         = var.project_id
+    VID_EXCL_GCS_DATA_BUCKET     = google_storage_bucket.video_exclusion_toolbox_data.name
+    VID_EXCL_BIGQUERY_DATASET    = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  }
+
+  secret_environment_variables {
+    key     = "GOOGLE_ADS_REFRESH_TOKEN"
+    secret  = google_secret_manager_secret.oauth_refresh_token.secret_id
+    version = "latest"
+  }
+  secret_environment_variables {
+    key     = "GOOGLE_ADS_CLIENT_ID"
+    secret  = google_secret_manager_secret.client_id.secret_id
+    version = "latest"
+  }
+  secret_environment_variables {
+    key     = "GOOGLE_ADS_CLIENT_SECRET"
+    secret  = google_secret_manager_secret.client_secret.secret_id
+    version = "latest"
+  }
+  secret_environment_variables {
+    key     = "GOOGLE_ADS_DEVELOPER_TOKEN"
+    secret  = google_secret_manager_secret.developer_token.secret_id
+    version = "latest"
   }
 }

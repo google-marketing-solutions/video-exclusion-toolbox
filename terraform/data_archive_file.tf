@@ -22,6 +22,11 @@ data "archive_file" "google_ads_exclusions" {
   output_path = ".temp/google_ads_exclusions.zip"
   source_dir  = "../src/google_ads_exclusions/"
 }
+data "archive_file" "google_ads_excluder" {
+  type        = "zip"
+  output_path = ".temp/google_ads_excluder.zip"
+  source_dir  = "../src/google_ads_excluder/"
+}
 data "archive_file" "google_ads_report_video" {
   type        = "zip"
   output_path = ".temp/google_ads_report_video.zip"
