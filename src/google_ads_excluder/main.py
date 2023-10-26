@@ -34,6 +34,11 @@ VID_EXCL_GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
 BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 
+SCOPES = [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/cloud-platform',
+]
+
 
 def main(request: str) -> str:
   """Starts the job to upload exclusions to Google Ads.
@@ -285,5 +290,6 @@ def upload_exclusions(
 
 def get_auth_credentials() -> google.auth.credentials.Credentials:
   """Returns credentials for Google APIs."""
-  credentials, _ = google.auth.default()
+  # Scopes include drive API here as one table is mirroring a Google Sheet
+  credentials, _ = google.auth.default(scopes=SCOPES)
   return credentials

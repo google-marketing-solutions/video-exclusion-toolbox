@@ -293,3 +293,58 @@ resource "google_bigquery_table" "google_ads_report_video_aggregated" {
     use_legacy_sql = false
   }
 }
+
+resource "google_bigquery_table" "videos_to_exclude" {
+  project             = "${var.project_id}"
+  table_id            = "VideosToExclude"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.exclusion_criteria
+  ]
+  view {
+    query          = <<-EOT
+      SELECT
+        DISTINCT video_id,
+        title,
+        description
+      FROM
+        `${var.project_id}.${var.bq_dataset}.YouTubeVideo`
+      WHERE
+        REGEXP_CONTAINS(UPPER(CONCAT(title, description, ARRAY_TO_STRING(tags, ' '))), (
+          SELECT
+            STRING_AGG(UPPER(keyword), '|')
+          FROM
+            `${var.project_id}.${var.bq_dataset}.ExclusionCriteria`));
+    EOT
+    use_legacy_sql = false
+  }
+}
+
+resource "google_bigquery_table" "channels_to_exclude" {
+  project             = "${var.project_id}"
+  table_id            = "ChannelsToExclude"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.exclusion_criteria
+  ]
+  view {
+    query          = <<-EOT
+      SELECT
+        DISTINCT channel_id,
+        title
+      FROM
+        `${var.project_id}.${var.bq_dataset}.YouTubeChannel`
+      WHERE
+        REGEXP_CONTAINS(UPPER((title)),(
+          SELECT
+            STRING_AGG(UPPER(keyword), '|')
+          FROM
+            `${var.project_id}.${var.bq_dataset}.ExclusionCriteria`));
+    EOT
+    use_legacy_sql = false
+  }
+}
