@@ -29,7 +29,6 @@ from google.cloud import pubsub_v1
 from google.cloud import vision
 import jsonschema
 import pandas as pd
-import PIL.Image
 import requests
 
 logging.basicConfig(stream=sys.stdout)
@@ -305,33 +304,30 @@ def _parse_label_annotations(
 
 def _get_best_resolution_thumbnails(
     video_id: str,
-) -> dict[PIL.Image.Image | None]:
+) -> list[str | None]:
   """Retrieves the best resolution of each video's thumbnails.
 
   Args:
       video_id: The id of YouTube video.
 
   Returns:
-      A dictionary with the thumbnail's url as the key and an Image object as
-      value. Returns an empty dictionary if no thumbnails were found.
+      A list of thumbnail urls. Returns an empty list if no thumbnails were
+      found.
   """
-  thumbnails = {}
+  thumbnail_urls = []
   for names in THUMBNAIL_RESOLUTIONS:
     for name in names:
       url = THUMBNAIL_URL_TEMPLATE.format(
           video_id=video_id, thumbnail_name=name
       )
 
-      response = requests.get(url, stream=True)
       if requests.get(url).status_code == 200:
         logger.info('Best resolution was found at %s', url)
-        thumbnails[url] = PIL.Image.open(response.raw)
+        thumbnail_urls.append(url)
         break
-  if thumbnails:
-    return thumbnails
-  else:
+  if not thumbnail_urls:
     logger.info('Did not find any usable thumbnails for video %s', video_id)
-    return {}
+  return thumbnail_urls
 
 
 def _write_results_to_bq(data: pd.DataFrame, table_id: str) -> None:
