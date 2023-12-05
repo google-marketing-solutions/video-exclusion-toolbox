@@ -65,8 +65,8 @@ variable "looker_studio_template" {
   default     = "2194043e-84bb-432b-b3e6-0553369745be"
 }
 
-variable "crop_and_store_objects" {
+variable "crop_objects" {
   type        = bool
-  description = "Switch whether to process the objects detected in a thumbnail."
+  description = "Switch whether to crop the objects detected in a thumbnail."
   default     = true
 }

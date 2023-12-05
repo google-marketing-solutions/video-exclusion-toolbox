@@ -273,7 +273,7 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_process" {
 
   environment_variables = {
     GOOGLE_CLOUD_PROJECT                           = var.project_id
-    VID_EXCL_CROP_AND_STORE_OBJECTS                = var.crop_and_store_objects
+    VID_EXCL_CROP_OBJECTS                          = var.crop_objects
     VID_EXCL_BIGQUERY_DATASET                      = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
     VID_EXCL_THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC = google_pubsub_topic.youtube_thumbnails_to_generate_cropouts.name
   }

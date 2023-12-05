@@ -22,8 +22,6 @@ import os
 import sys
 from typing import Any
 
-import google.auth
-import google.auth.credentials
 from google.cloud import bigquery
 from google.cloud import pubsub_v1
 from google.cloud import vision
@@ -43,17 +41,17 @@ BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC = os.environ.get(
     'VID_EXCL_THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC'
 )
+# Switch whether to store cropped thumbnail objecs in GCS.
+CROP_OBJECTS = os.environ.get(
+    'VID_EXCL_CROP_OBJECTS', 'False'
+).lower() in ('true', '1', 't')
 
 # Selector of what labels of objects will be cropped out.
 # For age recognition, 'Face' and 'Person' are recommended.
-OBJECTS_TO_CROP_AND_STORE = ['Face', 'Person']
+OBJECTS_TO_CROP = ['Face', 'Person']
 # BQ Table name to store the detected object's metadata. This is not expexted
 # to be configurable and so is not exposed as an environmental variable
 BQ_TABLE_NAME = 'YouTubeThumbnailsWithAnnotations'
-# Switch whether to store cropped thumbnail objecs in GCS.
-CROP_AND_STORE_OBJECTS = os.environ.get(
-    'VID_EXCL_CROP_AND_STORE_OBJECTS', 'False'
-).lower() in ('true', '1', 't')
 
 THUMBNAIL_URL_TEMPLATE = (
     'https://i.ytimg.com/vi/{video_id}/{thumbnail_name}.jpg'
@@ -107,11 +105,7 @@ def main(event: dict[str, Any], context: dict[str, Any]) -> None:
   # data when the Cloud Function is triggered from Pub/Sub
   del context
   logger.info('Thumbnail processor service triggered.')
-  logger.info('Message: %s', event)
-  message = base64.b64decode(event['data']).decode('utf-8')
-  logger.info('Decoded message: %s', message)
-  message_json = json.loads(message)
-  logger.info('JSON message: %s', message_json)
+  message_json = json.loads(base64.b64decode(event['data']).decode('utf-8'))
 
   # Will raise jsonschema.exceptions.ValidationError if the schema is invalid
   jsonschema.validate(instance=message_json, schema=MESSAGE_SCHEMA)
@@ -124,38 +118,12 @@ def main(event: dict[str, Any], context: dict[str, Any]) -> None:
 
 
 def run(video_id: str) -> None:
-  """Orchestrates processing all videos in a csv file.
-
-  Args:
-      video_id: The ID of the video to process the thumbnails for.
-  """
-  credentials = _get_auth_credentials()
-
-  logger.info('Starting to process video %s thumbnails.', video_id)
-  logger.info('Connecting to: %s BigQuery.', GOOGLE_CLOUD_PROJECT)
-  client = bigquery.Client(
-      project=GOOGLE_CLOUD_PROJECT, credentials=credentials
-  )
-  query = f"""
-    SELECT video_id
-    FROM {BQ_DATASET}.{BQ_TABLE_NAME}
-    WHERE video_id = '{video_id}'
-    """
-  rows = client.query(query).result()
-  if rows.total_rows > 0:
-    logger.info('Thumbnails for video %s already processed.', video_id)
-  else:
-    _process_video(video_id)
-    logger.info('Finished processing thumbnails for video %s.', video_id)
-
-
-def _process_video(video_id: str) -> None:
   """Orchestrates pulling YouTube data and output it to BigQuery.
 
   Args:
       video_id: The YouTube Video ID to process.
   """
-  logger.info('Looking up thumbnails for video %s.', video_id)
+  logger.info('Starting to process video %s thumbnails.', video_id)
   thumbnails = _get_best_resolution_thumbnails(video_id=video_id)
 
   extracted_data = []
@@ -188,16 +156,25 @@ def _process_video(video_id: str) -> None:
       len(thumbnails),
   )
 
-  _write_results_to_bq(
-      extracted_data, BQ_TABLE_NAME
-  )
+  _write_results_to_bq(extracted_data, BQ_TABLE_NAME)
 
-  if CROP_AND_STORE_OBJECTS:
+  if CROP_OBJECTS:
+    extracted_data = extracted_data.loc[
+        extracted_data['label']
+        .str
+        .lower()
+        .isin(map(str.lower, OBJECTS_TO_CROP))
+    ]
+    extracted_data.drop('datetime_updated', axis=1, inplace=True)
+    extracted_data.replace('0', 0, inplace=True)
     _send_video_for_processing(
         video_id=video_id,
+        video_metadata=extracted_data,
         topic=THUMBNAILS_TO_GENERATE_CROPOUTS_TOPIC,
         gcp_project=GOOGLE_CLOUD_PROJECT,
     )
+
+  logger.info('Finished processing thumbnails for video %s.', video_id)
 
 
 def _extract_features_df_from_image_uri(image_uri: str) -> pd.DataFrame:
@@ -228,12 +205,6 @@ def _extract_features_df_from_image_uri(image_uri: str) -> pd.DataFrame:
   ]
 
   return pd.DataFrame(faces + objects + labels)
-
-
-def _get_auth_credentials() -> google.auth.credentials.Credentials:
-  """Returns credentials for Google APIs."""
-  credentials, _ = google.auth.default()
-  return credentials
 
 
 def _parse_vision_object_annotations(
@@ -357,18 +328,26 @@ def _write_results_to_bq(data: pd.DataFrame, table_id: str) -> None:
 
 
 def _send_video_for_processing(
-    video_id: str, topic: str, gcp_project: str
+    video_id: str,
+    video_metadata: pd.DataFrame,
+    topic: str,
+    gcp_project: str,
 ) -> None:
   """Pushes the dictionary to pubsub.
 
   Args:
-      video_id: The viseo ID to push to pubsub.
+      video_id: The id of the YouTube video.
+      video_metadata: The video metadata to push to pubsub.
       topic: The name of the topic to publish the message to.
       gcp_project: The Google Cloud Project with the pub/sub topic in.
   """
   publisher = pubsub_v1.PublisherClient()
   topic_path = publisher.topic_path(gcp_project, topic)
-  message_str = json.dumps({'video_id': video_id})
+  message_str = json.dumps({
+      'video_id': video_id,
+      'objects': video_metadata.to_dict(orient='records')
+  }, indent=2)
+  # logger.info('JSON message: %s', message_str)
   # Data must be a bytestring
   data = message_str.encode('utf-8')
   publisher.publish(topic_path, data)

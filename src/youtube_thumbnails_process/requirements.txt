@@ -14,7 +14,6 @@
 
 fsspec==2023.9.0
 gcsfs==2023.9.0
-google-auth==2.22.0
 google-cloud-bigquery==3.11.4
 google-cloud-pubsub==2.18.3
 google-cloud-vision==3.4.4
