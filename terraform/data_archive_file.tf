@@ -52,10 +52,10 @@ data "archive_file" "youtube_thumbnails_dispatch" {
   output_path = ".temp/youtube_thumbnails_dispatch.zip"
   source_dir  = "../src/youtube_thumbnails_dispatch/"
 }
-data "archive_file" "youtube_thumbnails_process" {
+data "archive_file" "youtube_thumbnails_identify_objects" {
   type        = "zip"
-  output_path = ".temp/youtube_thumbnails_process.zip"
-  source_dir  = "../src/youtube_thumbnails_process/"
+  output_path = ".temp/youtube_thumbnails_identify_objects.zip"
+  source_dir  = "../src/youtube_thumbnails_identify_objects/"
 }
 data "archive_file" "youtube_thumbnails_generate_cropouts" {
   type        = "zip"

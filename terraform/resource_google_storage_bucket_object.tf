@@ -60,11 +60,11 @@ resource "google_storage_bucket_object" "youtube_thumbnails_dispatch" {
   source     = data.archive_file.youtube_thumbnails_dispatch.output_path
   depends_on = [data.archive_file.youtube_thumbnails_dispatch]
 }
-resource "google_storage_bucket_object" "youtube_thumbnails_process" {
-  name       = "youtube_thumbnails_process_${data.archive_file.youtube_thumbnails_process.output_md5}.zip"
+resource "google_storage_bucket_object" "youtube_thumbnails_identify_objects" {
+  name       = "youtube_thumbnails_process_${data.archive_file.youtube_thumbnails_identify_objects.output_md5}.zip"
   bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.youtube_thumbnails_process.output_path
-  depends_on = [data.archive_file.youtube_thumbnails_process]
+  source     = data.archive_file.youtube_thumbnails_identify_objects.output_path
+  depends_on = [data.archive_file.youtube_thumbnails_identify_objects]
 }
 resource "google_storage_bucket_object" "youtube_thumbnails_generate_cropouts" {
   name       = "youtube_thumbnails_generate_cropouts_${data.archive_file.youtube_thumbnails_generate_cropouts.output_md5}.zip"

@@ -254,13 +254,13 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_dispatch" {
 }
 
 
-resource "google_cloudfunctions_function" "youtube_thumbnails_process" {
+resource "google_cloudfunctions_function" "youtube_thumbnails_identify_objects" {
   region                = var.region
-  name                  = "vid-excl-youtube_thumbnails_process"
+  name                  = "vid-excl-youtube_thumbnails_identify_objects"
   description           = "Identify objects and labels in a thumbnail."
   runtime               = "python311"
   source_archive_bucket = google_storage_bucket.source_archive.name
-  source_archive_object = google_storage_bucket_object.youtube_thumbnails_process.name
+  source_archive_object = google_storage_bucket_object.youtube_thumbnails_identify_objects.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
   timeout               = 540
   available_memory_mb   = 1024
