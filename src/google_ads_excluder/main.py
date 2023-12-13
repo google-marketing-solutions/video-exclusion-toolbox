@@ -21,7 +21,7 @@ from google.ads.googleads.client import GoogleAdsClient
 import google.auth
 import google.auth.credentials
 from google.cloud import bigquery
-from google.protobuf.json_format import MessageToDict
+from google.protobuf import json_format
 import pandas as pd
 from utils import gcs
 
@@ -160,7 +160,7 @@ def get_exclusions(customer_id: str) -> pd.DataFrame:
       )
   ]
   for batch in stream:
-    dictobj = MessageToDict(batch)
+    dictobj = json_format.MessageToDict(batch)
     shared_criterions.append(
         pd.json_normalize(dictobj, record_path=['results'])
     )
