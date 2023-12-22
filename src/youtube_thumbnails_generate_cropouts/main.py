@@ -24,8 +24,6 @@ import sys
 from typing import Any
 import uuid
 
-import google.auth
-import google.auth.credentials
 from google.cloud import bigquery
 from google.cloud import storage
 import jsonschema
@@ -44,12 +42,8 @@ BIGQUERY_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 # The bucket to write the thumbnails to.
 THUMBNAIL_CROP_BUCKET = os.environ.get('VID_EXCL_THUMBNAIL_CROP_BUCKET')
 
-# Selector of what labels of objects will be cropped out.
-# For age recognition, 'Face' and 'Person' are recommended.
-OBJECTS_TO_CROP_AND_STORE = ['Face', 'Person']
 # BQ Table name to store the detected object's metadata. This is not expexted
 # to be configurable and so is not exposed as an environmental variable
-BQ_SOURCE_TABLE_NAME = 'YouTubeThumbnailsWithAnnotations'
 BQ_TARGET_TABLE_NAME = 'YouTubeThumbnailCropouts'
 CHARS_TO_REPLACE_IN_IMAGE_NAME = [':', '/', '.', '?', '#', '&', '=', '+']
 
@@ -58,9 +52,32 @@ MESSAGE_SCHEMA = {
     'type': 'object',
     'properties': {
         'video_id': {'type': 'string'},
+        'objects': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'thumbnail_url': {'type': 'string'},
+                    'label': {'type': 'string'},
+                    'top_left_x': {'type': 'number'},
+                    'top_left_y': {'type': 'number'},
+                    'bottom_right_x': {'type': 'number'},
+                    'bottom_right_y': {'type': 'number'},
+                },
+                'required': [
+                    'thumbnail_url',
+                    'label',
+                    'top_left_x',
+                    'top_left_y',
+                    'bottom_right_x',
+                    'bottom_right_y',
+                ]
+            },
+        },
     },
     'required': [
         'video_id',
+        'objects',
     ],
 }
 
@@ -81,138 +98,109 @@ def main(event: dict[str, Any], context: dict[str, Any]) -> None:
   # data when the Cloud Function is triggered from Pub/Sub
   del context
   logger.info('Thumbnail object cropping service triggered.')
-  logger.info('Message: %s', event)
-  message = base64.b64decode(event['data']).decode('utf-8')
-  logger.info('Decoded message: %s', message)
-  message_json = json.loads(message)
-  logger.info('JSON message: %s', message_json)
+  message_json = json.loads(base64.b64decode(event['data']).decode('utf-8'))
 
   # Will raise jsonschema.exceptions.ValidationError if the schema is invalid
   jsonschema.validate(instance=message_json, schema=MESSAGE_SCHEMA)
 
   video_id = message_json.get('video_id')
+  objects = message_json.get('objects')
 
-  run(video_id=video_id)
+  run(video_id=video_id, objects=objects)
 
   logger.info(
       'Thumbnail object cropping for video %s processing done.', video_id
   )
 
 
-def run(video_id: str) -> None:
+def run(video_id: str, objects: list[dict[str | float]]) -> None:
   """Crops objects for all thumbnails in a YouTube video.
 
   Args:
       video_id: The ID of the video to crop the objects thumbnails for.
+      objects: The objects to crop.
   """
-  credentials = _get_auth_credentials()
 
   logger.info('Starting to process video %s thumbnails.', video_id)
-  logger.info('Connecting to: %s BigQuery.', GOOGLE_CLOUD_PROJECT)
-  client = bigquery.Client(
-      project=GOOGLE_CLOUD_PROJECT, credentials=credentials
-  )
-  query = f"""
-    SELECT video_id
-    FROM {BIGQUERY_DATASET}.{BQ_TARGET_TABLE_NAME}
-    WHERE video_id = '{video_id}'
-    """
 
-  rows = client.query(query).result()
-  if rows.total_rows > 0:
-    logger.info('Thumbnails for video %s already processed.', video_id)
-  else:
-    _crop_objects_from_video_thubmnails(video_id, client=client)
-    logger.info('Finished processing thumbnails for video %s.', video_id)
-
-
-def _crop_objects_from_video_thubmnails(
-    video_id: str, client: bigquery.Client
-) -> None:
-  """Orchestrates cropping objects, storing them in GCS, keeping records in BQ.
-
-  Args:
-      video_id: The YouTube Video ID to process.
-      client: BigQuery client to use for BigQuery queries.
-  """
-
-  labels_for_query = ["'" + label + "'" for label in OBJECTS_TO_CROP_AND_STORE]
-  labels_for_query = '(' + ','.join(labels_for_query) + ')'
-
-  query = f"""
-    SELECT *
-    FROM {BIGQUERY_DATASET}.{BQ_SOURCE_TABLE_NAME}
-    WHERE video_id = '{video_id}'
-    AND label IN {labels_for_query}
-    """
-
-  source_data = client.query(query).to_dataframe()
-
-  if not source_data.empty:
-    logger.info(
-        'Cropping %d objects for video_id %s.',
-        len(source_data.index),
-        video_id,
-    )
-
-    cropouts = _generate_cropouts_from_dataframe(source_data)
-
-    client = storage.Client()
-    for cropout in cropouts:
-      _save_image_to_gcs(
-          client=client,
-          image=cropout['image_object'],
-          image_name=cropout['file_name'],
-          bucket_name=THUMBNAIL_CROP_BUCKET,
-          prefix=cropout['video_id'],
-      )
-    logger.info(
-        '%d object(s) stored in GCS.',
-        len(cropouts),
-    )
-
-    cropouts = pd.DataFrame(cropouts).drop('image_object', axis=1)
-
-    _write_results_to_bq(
-        cropouts, BQ_TARGET_TABLE_NAME
-    )
-  else:
+  if not objects:
     logger.error(
-        'There is no record of video %s in table %s.',
+        'No objects were received to be processed for video %s.',
         video_id,
-        BQ_SOURCE_TABLE_NAME,
+    )
+    return
+
+  logger.info('Expecting %d objects for video_id %s.', len(objects), video_id)
+
+  # transpose the list of object dictionaries into a dictionary of thumbnails
+  thumbnail_data = {}
+  for item in objects:
+    if item['thumbnail_url'] not in thumbnail_data:
+      thumbnail_data[item['thumbnail_url']] = []
+    thumbnail_data[item['thumbnail_url']].append(item)
+
+  cropouts = []
+  for thumbnail_url in thumbnail_data:
+    cropouts.extend(
+        _generate_cropouts(thumbnail_url, thumbnail_data[thumbnail_url])
     )
 
+  if not cropouts:
+    logger.error('Nothing was cropped for video %s.', video_id)
+    return
 
-def _generate_cropouts_from_dataframe(
-    cropout_data: pd.DataFrame
-) -> list[dict[PIL.Image.Image, dict[str, datetime]] | None]:
+  client = storage.Client()
+  for cropout in cropouts:
+    _save_image_to_gcs(
+        client=client,
+        image=cropout['image_object'],
+        image_name=cropout['file_name'],
+        bucket_name=THUMBNAIL_CROP_BUCKET,
+        prefix=cropout['video_id'],
+    )
+  logger.info(
+      '%d object(s) stored in GCS.',
+      len(cropouts),
+  )
+
+  cropouts = pd.DataFrame(cropouts).drop('image_object', axis=1)
+
+  _write_results_to_bq(
+      cropouts, BQ_TARGET_TABLE_NAME
+  )
+
+
+def _generate_cropouts(
+    thumbnail_url: str,
+    cropout_data: list[dict[str, Any]]
+) -> list[dict[PIL.Image.Image, dict[str, datetime]]]:
   """Generates cropouts from an image and preserve provided metadata.
 
   Args:
-    cropout_data: A dataframe with coordinates of each cropout.
+    thumbnail_url: The url of the thumbnail to crop.
+    cropout_data: Dictionaries with coordinates of each cropout.
 
   Returns:
     Dictionaries with cropped image objects and their metadata.
-    Returns an empty list if the cropout_data input is an empty dataframe.
+    Returns an empty list if the data input is an empty list.
 
     Example:
     [
       {
         'image_object': <PIL.Image.Image object>,
-        'video_id': 'video_id_1',
-        'thumbnail_url': 'thumbnail_url_1',
+        'video_id': 'video_id',
+        'thumbnail_url': 'thumbnail_url',
         'label': 'Face',
         'confidence': '0.996'
         'file_name': 'generated_file_name_1',
         'gs_file_path': 'gs://bucket/video_id_1/generated_file_name_1',
-        'fuse_file_path': '/gcs/bucket/video_id_1/generated_file_name_2',
+        'fuse_file_path': '/gcs/bucket/video_id_1/generated_file_name_1',
         'datetime_updated': datetime.datetime(2023, 9, 28, 7, 55, 54)
       },
       {
         'image_object': <PIL.Image.Image object>,
-        'video_id': 'video_id_2',
-        'thumbnail_url': 'thumbnail_url_2',
+        'video_id': 'video_id',
+        'thumbnail_url': 'thumbnail_url',
         'label': 'Person',
         'confidence': '0.984'
         'file_name': 'generated_file_name_2',
@@ -222,50 +210,41 @@ def _generate_cropouts_from_dataframe(
       }
     ]
   """
-  if cropout_data.empty:
-    logger.info('Nothing to crop.')
-    return []
-
-  cropout_data.sort_values(by='thumbnail_url', inplace=True)
-
   cropped_images = []
-  url = cropout_data['thumbnail_url'].iloc[0]
-  thumbnail = _get_image_from_url(url)
 
-  for _, row in cropout_data.iterrows():
+  if not cropout_data:
+    return cropped_images
 
-    if url != row['thumbnail_url']:
-      url = row['thumbnail_url']
-      thumbnail = _get_image_from_url(row['thumbnail_url'])
+  thumbnail = _get_image_from_url(thumbnail_url)
+  if not thumbnail:
+    logger.warning('Unable to get thumbnail from url %s.', thumbnail_url)
+    return cropped_images
 
-    if not thumbnail:
-      logger.error('Unable to get thumbnail from url %s.', url)
-      continue
-
+  for record in cropout_data:
     image_object = _cropout_from_image(
         image=thumbnail,
-        top_left_x=float(row['top_left_x']),
-        top_left_y=float(row['top_left_y']),
-        bottom_right_x=float(row['bottom_right_x']),
-        bottom_right_y=float(row['bottom_right_y']),
+        top_left_x=float(record['top_left_x']),
+        top_left_y=float(record['top_left_y']),
+        bottom_right_x=float(record['bottom_right_x']),
+        bottom_right_y=float(record['bottom_right_y']),
     )
     file_name = _generate_thumbnail_name(
-        video_url=row['thumbnail_url'],
-        label=row['label'],
+        video_url=record['thumbnail_url'],
+        label=record['label'],
     )
     gs_file_path = '/'.join(
-        ['gs:/', THUMBNAIL_CROP_BUCKET, row['video_id'], file_name]
+        ['gs:/', THUMBNAIL_CROP_BUCKET, record['video_id'], file_name]
     )
     fuse_file_path = '/'.join(
-        ['/gcs', THUMBNAIL_CROP_BUCKET, row['video_id'], file_name]
+        ['/gcs', THUMBNAIL_CROP_BUCKET, record['video_id'], file_name]
     )
 
     cropped_image = {
         'image_object': image_object,
-        'video_id': row['video_id'],
-        'thumbnail_url': row['thumbnail_url'],
-        'label': row['label'],
-        'confidence': row['confidence'],
+        'video_id': record['video_id'],
+        'thumbnail_url': record['thumbnail_url'],
+        'label': record['label'],
+        'confidence': record['confidence'],
         'file_name': file_name,
         'gs_file_path': gs_file_path,
         'fuse_file_path': fuse_file_path,
@@ -277,9 +256,10 @@ def _generate_cropouts_from_dataframe(
     cropped_images.append(cropped_image)
 
   logger.info(
-      'Cropped %d object(s) from thumbnail %s.',
+      'Cropped %d of %d object(s) from thumbnail %s.',
       len(cropped_images),
-      url,
+      len(cropout_data),
+      thumbnail_url,
   )
 
   return cropped_images
@@ -396,12 +376,6 @@ def _cropout_from_image(
   )
 
 
-def _get_auth_credentials() -> google.auth.credentials.Credentials:
-  """Return credentials for Google APIs."""
-  credentials, _ = google.auth.default()
-  return credentials
-
-
 def _write_results_to_bq(data: pd.DataFrame, table_id: str) -> None:
   """Write the YouTube dataframe to BQ.
 
@@ -417,12 +391,13 @@ def _write_results_to_bq(data: pd.DataFrame, table_id: str) -> None:
   if data is None or data.empty:
     logger.info('Nothing to write to BQ.')
   else:
-    logger.info('Writing results to BQ: %s', bq_destination)
     data_to_write = data.to_dict(orient='records')
     client = bigquery.Client()
 
     errors = client.insert_rows_json(bq_destination, data_to_write)
     if not errors:
-      logger.info('%d records written to BQ.', len(data_to_write))
+      logger.info(
+          '%d records written to BQ: %s.', len(data_to_write), bq_destination
+      )
     else:
       logger.error('Encountered errors while inserting rows: %s', errors)
