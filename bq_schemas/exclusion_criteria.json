@@ -1,0 +1,8 @@
+[
+  {
+    "name": "keyword",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "A keyword to be used for exclusions"
+  }
+]
