@@ -126,10 +126,10 @@ resource "google_bigquery_table" "youtube_thubmnail_cropouts" {
   schema              = file("../bq_schemas/youtube_thumbnail_cropout.json")
 }
 
-resource "google_bigquery_table" "exclusion_criteria" {
+resource "google_bigquery_table" "exclusion_keywords" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  table_id            = "ExclusionCriteria"
+  table_id            = "ExclusionKeywords"
   deletion_protection = false
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   external_data_configuration {
@@ -138,9 +138,9 @@ resource "google_bigquery_table" "exclusion_criteria" {
     source_uris = [
       "https://docs.google.com/spreadsheets/d/${var.config_sheet_id}"
     ]
-    schema = file("../bq_schemas/exclusion_criteria.json")
+    schema = file("../bq_schemas/exclusion_keywords.json")
     google_sheets_options {
-      range             = "ExclusionCriteria!A:A"
+      range             = "exclusion_keywords!A:A"
       skip_leading_rows = "1"
     }
   }
@@ -301,7 +301,7 @@ resource "google_bigquery_table" "videos_to_exclude" {
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
-    google_bigquery_table.exclusion_criteria
+    google_bigquery_table.exclusion_keywords
   ]
   view {
     query          = <<-EOT
@@ -312,11 +312,11 @@ resource "google_bigquery_table" "videos_to_exclude" {
       FROM
         `${var.project_id}.${var.bq_dataset}.YouTubeVideo`
       WHERE
-        REGEXP_CONTAINS(UPPER(CONCAT(title, description, ARRAY_TO_STRING(tags, ' '))), (
+        REGEXP_CONTAINS(LOWER(CONCAT(title, description, ARRAY_TO_STRING(tags, ' '))), (
           SELECT
-            STRING_AGG(UPPER(keyword), '|')
+            STRING_AGG(LOWER(keyword), '|')
           FROM
-            `${var.project_id}.${var.bq_dataset}.ExclusionCriteria`));
+            `${var.project_id}.${var.bq_dataset}.ExclusionKeywords`));
     EOT
     use_legacy_sql = false
   }
@@ -329,7 +329,7 @@ resource "google_bigquery_table" "channels_to_exclude" {
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
-    google_bigquery_table.exclusion_criteria
+    google_bigquery_table.exclusion_keywords
   ]
   view {
     query          = <<-EOT
@@ -339,11 +339,11 @@ resource "google_bigquery_table" "channels_to_exclude" {
       FROM
         `${var.project_id}.${var.bq_dataset}.YouTubeChannel`
       WHERE
-        REGEXP_CONTAINS(UPPER((title)),(
+        REGEXP_CONTAINS(LOWER((title)),(
           SELECT
-            STRING_AGG(UPPER(keyword), '|')
+            STRING_AGG(LOWER(keyword), '|')
           FROM
-            `${var.project_id}.${var.bq_dataset}.ExclusionCriteria`));
+            `${var.project_id}.${var.bq_dataset}.ExclusionKeywords`));
     EOT
     use_legacy_sql = false
   }
