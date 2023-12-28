@@ -10,4 +10,4 @@ jsonschema==4.19.0
 pandas==2.1.0
 fsspec==2023.9.0
 gcsfs==2023.9.0
-pyarrow==13.0.0
+pyarrow==14.0.2
