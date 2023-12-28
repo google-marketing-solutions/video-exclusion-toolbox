@@ -19,4 +19,4 @@ google-cloud-storage==2.10.0
 jsonschema==4.19.0
 pandas==2.1.0
 protobuf==4.24.2
-pyarrow==13.0.0
+pyarrow==14.0.2
