@@ -19,6 +19,7 @@ need to be processed and dispatches them to a Pub/Sub topic.
 """
 import base64
 from concurrent import futures
+import functools
 import json
 import logging
 import os
@@ -142,15 +143,39 @@ def _publish_videos_as_batch(
   publish_futures = []
 
   # Resolve the publish future in a separate thread.
-  def callback(future: pubsub_v1.publisher.futures.Future) -> None:
-    message_id = future.result()
-    logger.info('Message %s published', message_id)
+  def callback(
+      data: str,
+      current: int,
+      total: int,
+      topic_path: str,
+      future: futures.Future[str],
+  ) -> None:
 
-  for video_id in video_ids:
+    # Check for and log the exception for each dispatched message, this doesn't
+    # block other threads.
+    if future.exception():
+      logger.info(
+          'Failed to publish %s to %s, exception:\n%s.',
+          data.decode('UTF-8'),
+          topic_path,
+          str(future.exception())
+      )
+    else:
+      logger.info(
+          'Message %s (%d/%d) published to %s.',
+          data.decode('UTF-8'),
+          current,
+          total,
+          topic_path
+      )
+
+  for current, video_id in enumerate(video_ids):
     message_str = json.dumps({'video_id': video_id})
     data = message_str.encode('utf-8')
     publish_future = publisher.publish(topic_path, data)
-    publish_future.add_done_callback(callback)
+    publish_future.add_done_callback(
+        functools.partial(callback, data, current+1, len(video_ids), topic_path)
+    )
     publish_futures.append(publish_future)
 
   futures.wait(publish_futures, return_when=futures.ALL_COMPLETED)
