@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ message_schema = {
         'gads_filters',
     ],
 }
-# BQ Table name to store the Google Ads vieo placement report. This is not
+# BQ Table name to store the Google Ads video placement report. This is not
 # expected to be configurable and so is not exposed as an environmental variable
 BIGQUERY_TABLE_NAME = 'GoogleAdsReportVideo'
 

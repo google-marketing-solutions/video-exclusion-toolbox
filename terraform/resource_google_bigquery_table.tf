@@ -1,9 +1,9 @@
-# Copyright 2023 Google LLC
-# 
+# Copyright 2024 Google LLC
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
@@ -38,7 +38,20 @@ resource "google_bigquery_table" "google_ads_report_video" {
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/google_ads_report_video.json")
   time_partitioning {
-    type  = DAY
+    type  = "DAY"
+    field = "datetime_updated"
+  }
+}
+
+resource "google_bigquery_table" "google_ads_report_channel" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "GoogleAdsReportChannel"
+  deletion_protection = false
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  schema              = file("../bq_schemas/google_ads_report_channel.json")
+  time_partitioning {
+    type  = "DAY"
     field = "datetime_updated"
   }
 }
@@ -49,38 +62,7 @@ resource "google_bigquery_table" "google_ads_exclusions" {
   table_id            = "GoogleAdsExclusions"
   deletion_protection = false
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
-  external_data_configuration {
-    autodetect    = false
-    source_format = "CSV"
-    source_uris = [
-      "gs://${google_storage_bucket.video_exclusion_toolbox_data.name}/google_ads_exclusions/*.csv"
-    ]
-    schema = file("../bq_schemas/google_ads_exclusions.json")
-    csv_options {
-      quote             = ""
-      skip_leading_rows = "1"
-    }
-  }
-}
-
-resource "google_bigquery_table" "google_ads_report_channel" {
-  project             = "${var.project_id}"
-  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  table_id            = "GoogleAdsReportChannel"
-  deletion_protection = false
-  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
-  external_data_configuration {
-    autodetect    = false
-    source_format = "CSV"
-    source_uris = [
-      "gs://${google_storage_bucket.video_exclusion_toolbox_data.name}/google_ads_report_channel/*.csv"
-    ]
-    schema = file("../bq_schemas/google_ads_report_channel.json")
-    csv_options {
-      quote             = ""
-      skip_leading_rows = "1"
-    }
-  }
+  schema              = file("../bq_schemas/google_ads_exclusions.json")
 }
 
 resource "google_bigquery_table" "youtube_channel" {
