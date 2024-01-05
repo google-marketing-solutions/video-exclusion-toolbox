@@ -36,17 +36,10 @@ resource "google_bigquery_table" "google_ads_report_video" {
   table_id            = "GoogleAdsReportVideo"
   deletion_protection = false
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
-  external_data_configuration {
-    autodetect    = false
-    source_format = "CSV"
-    source_uris = [
-      "gs://${google_storage_bucket.video_exclusion_toolbox_data.name}/google_ads_report_video/*.csv"
-    ]
-    schema = file("../bq_schemas/google_ads_report_video.json")
-    csv_options {
-      quote             = ""
-      skip_leading_rows = "1"
-    }
+  schema              = file("../bq_schemas/google_ads_report_video.json")
+  time_partitioning {
+    type  = DAY
+    field = "datetime_updated"
   }
 }
 

@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-google-ads==21.3.0
-google-cloud-pubsub==2.18.3
-google-cloud-storage==2.10.0
-jsonschema==4.19.0
-pandas==2.1.0
+google-ads==22.1.0
+google-cloud-pubsub==2.19.0
+google-cloud-bigquery==3.14.1
+jsonschema==4.20.0
+pandas==2.1.4
+db-dtypes==1.2.0
