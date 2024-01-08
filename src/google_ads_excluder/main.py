@@ -195,20 +195,20 @@ def get_exclusions(client: GoogleAdsClient, customer_id: str) -> pd.DataFrame:
         pd.json_normalize(dictobj, record_path=['results'])
     )
 
-  df = pd.concat(shared_criterions, ignore_index=True)
+  exclusions = pd.concat(shared_criterions, ignore_index=True)
 
-  df['customer_id'] = customer_id
-  df['datetime_updated'] = pd.Timestamp.now().floor('S')
+  exclusions['customer_id'] = customer_id
+  exclusions['datetime_updated'] = pd.Timestamp.now().floor('S')
 
-  df.loc[df['sharedCriterion.type'] == 'YOUTUBE_CHANNEL', 'id'] = df[
-      'sharedCriterion.youtubeChannel.channelId'
-  ]
+  exclusions.loc[
+      exclusions['sharedCriterion.type'] == 'YOUTUBE_CHANNEL', 'id'
+  ] = exclusions['sharedCriterion.youtubeChannel.channelId']
 
-  df.loc[df['sharedCriterion.type'] == 'YOUTUBE_VIDEO', 'id'] = df[
-      'sharedCriterion.youtubeVideo.videoId'
-  ]
+  exclusions.loc[
+      exclusions['sharedCriterion.type'] == 'YOUTUBE_VIDEO', 'id'
+  ] = exclusions['sharedCriterion.youtubeVideo.videoId']
 
-  df.rename(
+  exclusions.rename(
       columns={
           'sharedSet.name': 'exclusion_list',
           'sharedCriterion.type': 'exclusion_type',
@@ -216,7 +216,7 @@ def get_exclusions(client: GoogleAdsClient, customer_id: str) -> pd.DataFrame:
       inplace=True,
   )
 
-  return df[[
+  return exclusions[[
       'id',
       'exclusion_list',
       'exclusion_type',
