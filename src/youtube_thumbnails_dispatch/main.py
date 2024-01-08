@@ -14,26 +14,21 @@
 
 """Dispatch Youtube Video IDs for processing, one by one.
 
-Retrieve a file from GCS containing Youtube Video IDs and dispatch each
-ID to a Pub/Sub topic for further processing.
+Retrieve Youtube Video IDs from a BQ table's partition, filters the ones that
+need to be processed and dispatches them to a Pub/Sub topic.
 """
 import base64
-import datetime
-import hashlib
+from concurrent import futures
+import functools
 import json
 import logging
 import os
 import sys
-import time
 from typing import Any, Dict
 
-from google.api_core import exceptions
-import google.auth
-import google.auth.credentials
 from google.cloud import bigquery
 from google.cloud import pubsub_v1
 import jsonschema
-import pandas as pd
 
 logging.basicConfig(stream=sys.stdout)
 logger = logging.getLogger(__name__)
@@ -44,8 +39,6 @@ GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 # The name of the BigQuery Dataset.
 BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 # The bucket to read the file with video IDs from.
-GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
-# The bucket to read the file with video IDs from.
 THUMBNAIL_PROCESSING_TOPIC = os.environ.get(
     'VID_EXCL_THUMBNAIL_PROCESSING_TOPIC'
 )
@@ -54,13 +47,16 @@ THUMBNAIL_PROCESSING_TOPIC = os.environ.get(
 message_schema = {
     'type': 'object',
     'properties': {
-        'customer_id': {'type': 'string'},
-        'blob_name': {'type': 'string'},
+        'date_partition': {'type': 'string'},
     },
     'required': [
-        'blob_name',
+        'date_partition',
     ],
 }
+# BQ Table names to store the Youtube data in. This is not
+# expected to be configurable and so is not exposed as an environmental variable
+BQ_SOURCE_TABLE_NAME = 'GoogleAdsReportVideo'
+BQ_TARGET_TABLE_NAME = 'YouTubeThumbnailsWithAnnotations'
 
 
 def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
@@ -76,6 +72,8 @@ def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
       jsonschema.exceptions.ValidationError if the message from pub/sub is not
       what is expected.
   """
+  # deleting context, as it's not required, but gets passed in along the "event"
+  # data when the Cloud Function is triggered from Pub/Sub
   del context
   logger.info('Thumbnail dispatcher process triggered.')
   logger.info('Message: %s', event)
@@ -87,134 +85,101 @@ def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
   # Will raise jsonschema.exceptions.ValidationError if the schema is invalid
   jsonschema.validate(instance=message_json, schema=message_schema)
 
-  run(blob_name=message_json.get('blob_name'))
+  run(date_partition=message_json.get('date_partition'))
 
   logger.info('Done dispatching video_ids for thumbnail processing.')
 
 
-def run(blob_name: str) -> None:
-  """Orchestration to process all videos in a csv file.
+def run(date_partition: str) -> None:
+  """Gets new video ids from BigQuery table and triggers thumbnail processing.
 
   Args:
-      blob_name: The name of the file containing a list of video IDs to process.
+      date_partition: The date of the partition containing a list of video IDs
+      to process.
   """
-
-  credentials = get_auth_credentials()
-
-  video_data = pd.read_csv(f'gs://{GCS_DATA_BUCKET}/{blob_name}')
-  video_ids = video_data[['video_id']]
-  logger.info('Checking new videos.')
   logger.info('Connecting to: %s BigQuery.', GOOGLE_CLOUD_PROJECT)
-  client = bigquery.Client(
-      project=GOOGLE_CLOUD_PROJECT, credentials=credentials
-  )
-  temp_table = temp_table_from_csv(video_ids, client)
-  query = f"""
-            SELECT video_id
-            FROM
-            `{BQ_DATASET}.{temp_table}`
-            WHERE
-            video_id NOT IN
-              (SELECT
-                video_id
-              FROM `{BQ_DATASET}.YouTubeThumbnailsWithAnnotations`)
-            """
-  rows = client.query(query).result()
-  if rows.total_rows is not None and rows.total_rows > 0:
+  client = bigquery.Client()
+  query = f'''
+      SELECT DISTINCT video_id FROM {GOOGLE_CLOUD_PROJECT}.{BQ_DATASET}.{BQ_SOURCE_TABLE_NAME}
+      WHERE TIMESTAMP_TRUNC(datetime_updated, DAY) = TIMESTAMP("{date_partition}")
+      AND video_id NOT IN
+        (SELECT DISTINCT video_id FROM {GOOGLE_CLOUD_PROJECT}.{BQ_DATASET}.{BQ_TARGET_TABLE_NAME})
+  '''
+
+  data = client.query(query).to_dataframe()
+  if data.empty:
+    logger.info('No new video IDs to process.')
+  else:
+    video_ids = data['video_id'].tolist()
     logger.info(
         '%d new video_id(s) to be dispatched for thumbnail processing.',
-        rows.total_rows,
+        len(video_ids),
     )
-    counter = 1
-    for row in rows:
-      _send_video_for_processing(
-          video_id=row.video_id,
-          topic=THUMBNAIL_PROCESSING_TOPIC,
-          gcp_project=GOOGLE_CLOUD_PROJECT,
-      )
-      logger.info('Dispatched %d of %d.', counter, rows.total_rows)
-      counter += 1
-  else:
-    logger.info('No new video IDs to process.')
+    _publish_videos_as_batch(
+        project_id=GOOGLE_CLOUD_PROJECT,
+        topic_id=THUMBNAIL_PROCESSING_TOPIC,
+        video_ids=video_ids,
+    )
 
 
-def _send_video_for_processing(
-    video_id: str, topic: str, gcp_project: str
+def _publish_videos_as_batch(
+    project_id: str,
+    topic_id: str,
+    video_ids: list[str],
 ) -> None:
-  """Pushes the dictionary to pubsub.
+  """Publishes multiple messages to a Pub/Sub topic with batch settings.
 
   Args:
-      video_id: The viseo ID to push to pubsub.
-      topic: The name of the topic to publish the message to.
-      gcp_project: The Google Cloud Project with the pub/sub topic in.
+      project_id: The Google Cloud Project with the pub/sub topic in.
+      topic_id: The name of the topic to publish the message to.
+      video_ids: The video IDs to publish to the topic.
   """
-  publisher = pubsub_v1.PublisherClient()
-  topic_path = publisher.topic_path(gcp_project, topic)
-  message_str = json.dumps({'video_id': video_id})
-  # Data must be a bytestring
-  data = message_str.encode('utf-8')
-  publisher.publish(topic_path, data)
-  logger.info('Video %s dispatched for thumbnail processing.', video_id)
 
-
-def temp_table_from_csv(data: pd.DataFrame, client: bigquery.Client) -> str:
-  """Creates a temporary BQ table to store video IDs for querying.
-
-  Args:
-      data: A dataframe containing the video IDs to be written.
-      client: A BigQuery client object.
-
-  Returns:
-      The name of the temporary table.
-  """
-  timestamp = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-  suffix = hashlib.sha256(timestamp.encode('utf-8')).hexdigest()[:6]
-  table_name = '-'.join(['temp-video-ids', suffix, timestamp])
-  destination = '.'.join([GOOGLE_CLOUD_PROJECT, BQ_DATASET, table_name])
-  logger.info('Creating a temporary table: %s', table_name)
-
-  job_config = bigquery.LoadJobConfig(
-      schema=[
-          bigquery.SchemaField(
-              'video_id', bigquery.enums.SqlTypeNames.STRING
-          ),
-      ],
-      write_disposition='WRITE_TRUNCATE',
+  batch_settings = pubsub_v1.types.BatchSettings(
+      max_messages=100
   )
+  publisher = pubsub_v1.PublisherClient(batch_settings)
+  topic_path = publisher.topic_path(project_id, topic_id)
+  publish_futures = []
 
-  job = client.load_table_from_dataframe(
-      dataframe=data, destination=destination, job_config=job_config
-  )
-  job.result()
+  # Resolve the publish future in a separate thread.
+  def callback(
+      data: str,
+      current: int,
+      total: int,
+      topic_path: str,
+      future: futures.Future[str],
+  ) -> None:
 
-  expiration = datetime.datetime.now(
-      datetime.timezone.utc
-  ) + datetime.timedelta(hours=1)
+    # Check for and log the exception for each dispatched message, this doesn't
+    # block other threads.
+    if future.exception():
+      logger.info(
+          'Failed to publish %s to %s, exception:\n%s.',
+          data.decode('UTF-8'),
+          topic_path,
+          str(future.exception())
+      )
+    else:
+      logger.info(
+          'Message %s (%d/%d) published to %s.',
+          data.decode('UTF-8'),
+          current,
+          total,
+          topic_path
+      )
 
-  # This is not elegant, but necessary. BQ seems to sometimes refuse to update
-  # table's metadata shortly after creating it. Retrying after a few seconds
-  # is a crude, but working workaround.
-  try:
-    table = client.get_table(destination)
-    table.expires = expiration
-    client.update_table(table, ['expires'])
-  except exceptions.PreconditionFailed:
-    logger.info(
-        "Failed to update expiration for table '%s' wating 5 seconds and"
-        ' retrying.',
-        table_name
+  for current, video_id in enumerate(video_ids):
+    message_str = json.dumps({'video_id': video_id})
+    data = message_str.encode('utf-8')
+    publish_future = publisher.publish(topic_path, data)
+    publish_future.add_done_callback(
+        functools.partial(callback, data, current+1, len(video_ids), topic_path)
     )
-    time.sleep(5)
-    table = client.get_table(destination)
-    table.expires = expiration
-    client.update_table(table, ['expires'])
+    publish_futures.append(publish_future)
 
-  logger.info('Table \'%s\' created.', table_name)
+  futures.wait(publish_futures, return_when=futures.ALL_COMPLETED)
 
-  return table_name
-
-
-def get_auth_credentials() -> google.auth.credentials.Credentials:
-  """Returns credentials for Google APIs."""
-  credentials, _ = google.auth.default()
-  return credentials
+  logger.info(
+      'Published %d messages as a batch to %s.', len(video_ids), topic_path
+  )

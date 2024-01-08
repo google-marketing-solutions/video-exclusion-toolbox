@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,23 +13,25 @@
 # limitations under the License.
 """Output the placement report from Google Ads to BigQuery."""
 import base64
-import datetime
 import json
 import logging
 import os
 import sys
+
 from google.ads.googleads.client import GoogleAdsClient
-from google.protobuf.json_format import MessageToDict
+from google.cloud import bigquery
+from google.protobuf import json_format
 import jsonschema
 import pandas as pd
-from utils import gcs
 
 logging.basicConfig(stream=sys.stdout)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# The bucket to write the data to
-VID_EXCL_GCS_DATA_BUCKET = os.environ.get('VID_EXCL_GCS_DATA_BUCKET')
+# The Google Cloud project containing the GCS bucket
+GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
+# The name of the BigQuery Dataset.
+BIGQUERY_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 
 # The schema of the JSON in the event payload
 message_schema = {
@@ -41,10 +43,13 @@ message_schema = {
         'customer_id',
     ],
 }
+# BQ Table name to store the Google Ads video placement report. This is not
+# expected to be configurable and so is not exposed as an environmental variable
+BIGQUERY_TABLE_NAME = 'GoogleAdsExclusions'
 
 
 def main(event: str, context: str) -> None:
-  """The entry point: extract the data from the payload and starts the job.
+  """The entry point: extracts the data from the payload and starts the job.
 
   The pub/sub message must match the message_schema object above.
 
@@ -64,24 +69,35 @@ def main(event: str, context: str) -> None:
 
   run(message_json.get('customer_id'))
 
-  logger.info('Done')
+  logger.info('Google Ads Exclusions Service finished.')
 
 
 def run(customer_id: str) -> None:
-  """Start the job to run the report from Google Ads & output it.
+  """Starts the job to run the report from Google Ads and write it to BQ.
 
   Args:
     customer_id: the customer ID to fetch the Google Ads data for.
   """
   logger.info('Starting job to fetch Google Ads exclusion data for %s',
               customer_id)
-  exclusions_filename = f'google_ads_exclusions/{customer_id}.csv'
-  df = get_exclusions(customer_id)
-  write_results_to_gcs(exclusions_filename, df)
+
+  data = _get_exclusions(customer_id)
+
+  if data.empty:
+    logger.info('No exclusions found.')
+    return
+
+  bq_client = bigquery.Client()
+  _write_results_to_bq(
+      client=bq_client,
+      data=data,
+      table_name=BIGQUERY_TABLE_NAME
+  )
+
   logger.info('Job complete')
 
 
-def get_exclusions(customer_id: str) -> pd.DataFrame:
+def _get_exclusions(customer_id: str) -> pd.DataFrame:
   """Runs the group placement report in Google Ads & returns a Dataframe of the data.
 
   Args:
@@ -91,7 +107,7 @@ def get_exclusions(customer_id: str) -> pd.DataFrame:
     A Pandas DataFrame containing the report results.
   """
   logger.info('Getting report stream for %s', customer_id)
-  client = GoogleAdsClient.load_from_env(version='v13')
+  client = GoogleAdsClient.load_from_env(version='v14')
   ga_service = client.get_service('GoogleAdsService')
 
   query = """
@@ -123,26 +139,25 @@ def get_exclusions(customer_id: str) -> pd.DataFrame:
       )
   ]
   for batch in stream:
-    dictobj = MessageToDict(batch)
+    dictobj = json_format.MessageToDict(batch)
     shared_criterions.append(
         pd.json_normalize(dictobj, record_path=['results'])
     )
 
-  df = pd.concat(shared_criterions, ignore_index=True)
-  now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+  exclusions = pd.concat(shared_criterions, ignore_index=True)
 
-  df['customer_id'] = int(customer_id)
-  df['datetime_updated'] = now
+  exclusions['customer_id'] = customer_id
+  exclusions['datetime_updated'] = pd.Timestamp.now().floor('S')
 
-  df.loc[df['sharedCriterion.type'] == 'YOUTUBE_CHANNEL', 'id'] = df[
-      'sharedCriterion.youtubeChannel.channelId'
-  ]
+  exclusions.loc[
+      exclusions['sharedCriterion.type'] == 'YOUTUBE_CHANNEL', 'id'
+  ] = exclusions['sharedCriterion.youtubeChannel.channelId']
 
-  df.loc[df['sharedCriterion.type'] == 'YOUTUBE_VIDEO', 'id'] = df[
-      'sharedCriterion.youtubeVideo.videoId'
-  ]
+  exclusions.loc[
+      exclusions['sharedCriterion.type'] == 'YOUTUBE_VIDEO', 'id'
+  ] = exclusions['sharedCriterion.youtubeVideo.videoId']
 
-  df.rename(
+  exclusions.rename(
       columns={
           'sharedSet.name': 'exclusion_list',
           'sharedCriterion.type': 'exclusion_type',
@@ -150,7 +165,7 @@ def get_exclusions(customer_id: str) -> pd.DataFrame:
       inplace=True,
   )
 
-  return df[[
+  return exclusions[[
       'id',
       'exclusion_list',
       'exclusion_type',
@@ -159,24 +174,27 @@ def get_exclusions(customer_id: str) -> pd.DataFrame:
   ]]
 
 
-def write_results_to_gcs(filename: str, df: pd.DataFrame) -> None:
-  """Writes the report dataframe to GCS as a CSV file.
+def _write_results_to_bq(
+    client: bigquery.Client,
+    data: pd.DataFrame,
+    table_name: str,
+) -> None:
+  """Writes the YouTube dataframe to BQ.
 
   Args:
-    filename: Name of the file to write to GCS.
-    df: The dataframe based on the Google Ads report.
+      client: The BigQuery client.
+      data: The dataframe based on the YouTube data.
+      table_name: The name of the BQ table.
   """
-  number_of_rows = len(df.index)
 
-  if number_of_rows > 0:
-    logger.info(
-        'Writing %d rows to GCS: {VID_EXCL_GCS_DATA_BUCKET}/%s.',
-        number_of_rows,
-        filename,
-    )
-    gcs.upload_blob_from_df(
-        df=df, blob_name=filename, bucket=VID_EXCL_GCS_DATA_BUCKET
-    )
-    logger.info('Blob uploaded to GCS')
-  else:
-    logger.info('There is nothing to write to GCS')
+  destination = '.'.join([GOOGLE_CLOUD_PROJECT, BIGQUERY_DATASET, table_name])
+  job_config = bigquery.LoadJobConfig(
+      write_disposition='WRITE_TRUNCATE',
+  )
+
+  job = client.load_table_from_dataframe(
+      dataframe=data, destination=destination, job_config=job_config
+  )
+  job.result()
+
+  logger.info('Wrote %d records to table %s.', len(data.index), destination)

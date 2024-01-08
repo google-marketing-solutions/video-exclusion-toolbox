@@ -1,11 +1,5 @@
-fsspec==2023.9.0
-gcsfs==2023.9.0
-google-api-python-client==2.97.0
-google-auth==2.22.0
-google-auth-httplib2==0.1.0
-google-auth-oauthlib==1.0.0
-google-cloud-bigquery==3.5.0
-google-cloud-pubsub==2.18.3
-jsonschema==4.19.0
-pandas==2.1.0
-pyarrow==14.0.2
+google-cloud-bigquery==3.14.1
+google-cloud-pubsub==2.19.0
+jsonschema==4.20.0
+pandas==2.1.4
+db-dtypes==1.2.0

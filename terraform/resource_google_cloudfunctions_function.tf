@@ -1,9 +1,9 @@
-# Copyright 2023 Google LLC
-# 
+# Copyright 2024 Google LLC
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
@@ -53,7 +53,7 @@ resource "google_cloudfunctions_function" "google_ads_exclusions" {
     GOOGLE_ADS_USE_PROTO_PLUS    = false
     GOOGLE_ADS_LOGIN_CUSTOMER_ID = var.google_ads_login_customer_id
     GOOGLE_CLOUD_PROJECT         = var.project_id
-    VID_EXCL_GCS_DATA_BUCKET     = google_storage_bucket.video_exclusion_toolbox_data.name
+    VID_EXCL_BIGQUERY_DATASET    = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   }
 
   secret_environment_variables {
@@ -101,7 +101,7 @@ resource "google_cloudfunctions_function" "google_ads_report_video" {
     GOOGLE_ADS_USE_PROTO_PLUS           = false
     GOOGLE_ADS_LOGIN_CUSTOMER_ID        = var.google_ads_login_customer_id
     GOOGLE_CLOUD_PROJECT                = var.project_id
-    VID_EXCL_GCS_DATA_BUCKET            = google_storage_bucket.video_exclusion_toolbox_data.name
+    VID_EXCL_BIGQUERY_DATASET           = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
     VID_EXCL_YOUTUBE_VIDEO_PUBSUB_TOPIC = google_pubsub_topic.youtube_video.name
   }
 
@@ -150,7 +150,7 @@ resource "google_cloudfunctions_function" "google_ads_report_channel" {
     GOOGLE_ADS_USE_PROTO_PLUS             = false
     GOOGLE_ADS_LOGIN_CUSTOMER_ID          = var.google_ads_login_customer_id
     GOOGLE_CLOUD_PROJECT                  = var.project_id
-    VID_EXCL_GCS_DATA_BUCKET              = google_storage_bucket.video_exclusion_toolbox_data.name
+    VID_EXCL_BIGQUERY_DATASET             = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
     VID_EXCL_YOUTUBE_CHANNEL_PUBSUB_TOPIC = google_pubsub_topic.youtube_channel.name
   }
 
@@ -198,7 +198,6 @@ resource "google_cloudfunctions_function" "youtube_channel" {
   environment_variables = {
     GOOGLE_CLOUD_PROJECT      = var.project_id
     VID_EXCL_BIGQUERY_DATASET = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-    VID_EXCL_GCS_DATA_BUCKET  = google_storage_bucket.video_exclusion_toolbox_data.name
   }
 }
 
@@ -223,7 +222,6 @@ resource "google_cloudfunctions_function" "youtube_video" {
   environment_variables = {
     GOOGLE_CLOUD_PROJECT      = var.project_id
     VID_EXCL_BIGQUERY_DATASET = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-    VID_EXCL_GCS_DATA_BUCKET  = google_storage_bucket.video_exclusion_toolbox_data.name
   }
 }
 
@@ -249,7 +247,6 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_dispatch" {
     GOOGLE_CLOUD_PROJECT                = var.project_id
     VID_EXCL_THUMBNAIL_PROCESSING_TOPIC = google_pubsub_topic.youtube_thumbnails_to_process.name
     VID_EXCL_BIGQUERY_DATASET           = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-    VID_EXCL_GCS_DATA_BUCKET            = google_storage_bucket.video_exclusion_toolbox_data.name
   }
 }
 
