@@ -33,6 +33,7 @@ https://www.googleapis.com/auth/spreadsheets.readonly
 https://www.googleapis.com/auth/cloud-platform
 https://www.googleapis.com/auth/youtube
 https://www.googleapis.com/auth/adwords
+https://www.googleapis.com/auth/drive
 ```
 
 ## Pre-requisites
