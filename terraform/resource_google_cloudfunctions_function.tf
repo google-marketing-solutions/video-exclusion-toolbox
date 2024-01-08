@@ -318,7 +318,6 @@ resource "google_cloudfunctions_function" "google_ads_excluder" {
     GOOGLE_ADS_USE_PROTO_PLUS    = false
     GOOGLE_ADS_LOGIN_CUSTOMER_ID = var.google_ads_login_customer_id
     GOOGLE_CLOUD_PROJECT         = var.project_id
-    VID_EXCL_GCS_DATA_BUCKET     = google_storage_bucket.video_exclusion_toolbox_data.name
     VID_EXCL_BIGQUERY_DATASET    = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   }
 
