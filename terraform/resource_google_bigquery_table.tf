@@ -87,7 +87,7 @@ resource "google_bigquery_table" "youtube_thubmnails" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeThumbnailsWithAnnotations"
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_thumbnail_annotation.json")
 }
@@ -100,6 +100,29 @@ resource "google_bigquery_table" "youtube_thubmnail_cropouts" {
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_thumbnail_cropout.json")
 }
+
+
+resource "google_bigquery_table" "videos_with_matched_keywords" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "VideosWithMatchedKeywords"
+  description         = "This table is populated by the 'identify_videos_with_kewords' stored procedure."
+  deletion_protection = false
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  schema              = file("../bq_schemas/videos_with_matched_keywords.json")
+}
+
+
+resource "google_bigquery_table" "channels_with_matched_keywords" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "ChannelsWithMatchedKeywords"
+  description         = "This table is populated by the 'identify_channels_with_kewords' stored procedure."
+  deletion_protection = false
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  schema              = file("../bq_schemas/channels_with_matched_keywords.json")
+}
+
 
 resource "google_bigquery_table" "exclusion_keywords" {
   project             = "${var.project_id}"
@@ -276,22 +299,21 @@ resource "google_bigquery_table" "videos_to_exclude" {
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
-    google_bigquery_table.exclusion_keywords
+    google_bigquery_table.videos_with_matched_keywords
   ]
   view {
-    query          = <<-EOT
+    query = <<-EOT
       SELECT
-        DISTINCT video_id,
-        title,
-        description
-      FROM
-        `${var.project_id}.${var.bq_dataset}.YouTubeVideo`
-      WHERE
-        REGEXP_CONTAINS(LOWER(CONCAT(title, description, ARRAY_TO_STRING(tags, ' '))), (
-          SELECT
-            STRING_AGG(LOWER(keyword), '|')
-          FROM
-            `${var.project_id}.${var.bq_dataset}.ExclusionKeywords`));
+        DISTINCT video_id, video_url, title, description, tags,
+        CONCAT(
+          'Found: ',
+          ARRAY_TO_STRING([
+            CONCAT('[', title_match, '] in title'),
+            CONCAT('[', description_match, '] in description'),
+            CONCAT('[', tags_match, '] in tags')],
+          ', ')
+        ) as reason
+      FROM ${var.project_id}.${var.bq_dataset}.VideosWithMatchedKeywords
     EOT
     use_legacy_sql = false
   }
@@ -304,21 +326,98 @@ resource "google_bigquery_table" "channels_to_exclude" {
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
-    google_bigquery_table.exclusion_keywords
+    google_bigquery_table.channels_with_matched_keywords
   ]
   view {
-    query          = <<-EOT
+    query = <<-EOT
       SELECT
-        DISTINCT channel_id,
-        title
-      FROM
-        `${var.project_id}.${var.bq_dataset}.YouTubeChannel`
-      WHERE
-        REGEXP_CONTAINS(LOWER((title)),(
-          SELECT
-            STRING_AGG(LOWER(keyword), '|')
-          FROM
-            `${var.project_id}.${var.bq_dataset}.ExclusionKeywords`));
+        DISTINCT channel_id, channel_url, title,
+        CONCAT('Found: [', title_match, '] in title') as reason
+      FROM ${var.project_id}.${var.bq_dataset}.ChannelsWithMatchedKeywords
+    EOT
+    use_legacy_sql = false
+  }
+}
+
+resource "google_bigquery_table" "video_keyword_statistics" {
+  project             = "${var.project_id}"
+  table_id            = "VideoKeywordStatistics"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.videos_with_matched_keywords
+  ]
+  view {
+    query = <<-EOT
+      WITH exploded_table AS (
+        SELECT
+          SPLIT(title_match, ',') AS title_words,
+          SPLIT(description_match, ',') AS description_words,
+          SPLIT(tags_match, ',') AS tags_words
+        FROM ${var.project_id}.${var.bq_dataset}.VideosWithMatchedKeywords
+      ),
+      title_keywords as (
+        SELECT trim(words) as keyword FROM
+        exploded_table,
+        UNNEST(title_words) as words
+      ),
+      description_keywords as (
+        SELECT trim(words) as keyword FROM
+        exploded_table,
+        UNNEST(description_words) as words
+      ),
+      tags_keywords as (
+        SELECT trim(words) as keyword FROM
+        exploded_table,
+        UNNEST(tags_words) as words
+      )
+      SELECT
+        keyword,
+        COUNT(*) AS total_matched_keywords,
+        SUM(CASE WHEN table = 'title_keywords' THEN 1 ELSE 0 END) AS title_matched_keywords,
+        SUM(CASE WHEN table = 'description_keywords' THEN 1 ELSE 0 END) AS description_matched_keywords,
+        SUM(CASE WHEN table = 'tags_keywords' THEN 1 ELSE 0 END) AS tags_matched_keywords
+      FROM (
+        SELECT keyword, 'title_keywords' AS table FROM title_keywords
+        UNION ALL
+        SELECT keyword, 'description_keywords' AS table FROM description_keywords
+        UNION ALL
+        SELECT keyword, 'tags_keywords' AS table FROM tags_keywords
+      ) AS all_keywords
+      GROUP BY keyword
+      ORDER BY 2 DESC, 3 DESC, 4 DESC, 5 DESC;
+    EOT
+    use_legacy_sql = false
+  }
+}
+
+resource "google_bigquery_table" "channel_keyword_statistics" {
+  project             = "${var.project_id}"
+  table_id            = "ChannelKeywordStatistics"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+  ]
+  view {
+    query = <<-EOT
+      WITH exploded_table AS (
+        SELECT
+          SPLIT(title_match, ',') AS title_words
+        FROM ${var.project_id}.${var.bq_dataset}.ChannelsWithMatchedKeywords
+      ),
+      title_keywords as (
+        SELECT trim(words) as keyword FROM
+        exploded_table,
+        UNNEST(title_words) as words
+      )
+      SELECT
+        keyword,
+        COUNT(*) AS title_matched_keywords
+      FROM title_keywords
+      GROUP BY 1
+      ORDER BY 2 DESC, 1;
     EOT
     use_legacy_sql = false
   }

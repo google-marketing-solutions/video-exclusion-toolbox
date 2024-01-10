@@ -1,0 +1,26 @@
+[
+  {
+    "name": "channel_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The placement id (Channel ID)"
+  },
+  {
+    "name": "channel_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The URL of the placement"
+  },
+  {
+    "name": "title",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The title of the video"
+  },
+  {
+    "name": "title_match",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "All keywords that were matched in the title"
+  }
+]

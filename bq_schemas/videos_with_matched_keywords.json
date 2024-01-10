@@ -1,0 +1,56 @@
+[
+  {
+    "name": "video_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The placement id (Video ID)"
+  },
+  {
+    "name": "video_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The URL of the placement"
+  },
+  {
+    "name": "channel_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The placement id (Channel ID)"
+  },
+  {
+    "name": "title",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The title of the video"
+  },
+  {
+    "name": "description",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The description of the video"
+  },
+  {
+    "name": "tags",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Comma separated tags of the video"
+  },
+  {
+    "name": "title_match",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "All keywords that were matched in the title"
+  },
+  {
+    "name": "description_match",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "All keywords that were matched in the description"
+  },
+  {
+    "name": "tags_match",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "All keywords that were matched in the tags"
+  }
+]
