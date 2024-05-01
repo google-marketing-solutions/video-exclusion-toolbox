@@ -17,15 +17,6 @@ resource "google_storage_bucket" "source_archive" {
   location                    = var.region
   force_destroy               = true
   uniform_bucket_level_access = true
-
-  lifecycle_rule {
-    condition {
-      age = 1
-    }
-    action {
-      type = "Delete"
-    }
-  }
 }
 
 
