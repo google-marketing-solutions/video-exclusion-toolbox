@@ -196,22 +196,22 @@ def _get_video_placement_report(
           row.metrics.ctr,
           row.metrics.all_conversions_from_interactions_rate,
       ])
-    data = pd.DataFrame(
-        data, columns=[
-            'customer_id',
-            'channel_id',
-            'placement_target_url',
-            'impressions',
-            'cost_micros',
-            'conversions',
-            'video_view_rate',
-            'video_views',
-            'clicks',
-            'average_cpm',
-            'ctr',
-            'all_conversions_from_interactions_rate',
-        ],
-    )
+  data = pd.DataFrame(
+      data, columns=[
+          'customer_id',
+          'channel_id',
+          'placement_target_url',
+          'impressions',
+          'cost_micros',
+          'conversions',
+          'video_view_rate',
+          'video_views',
+          'clicks',
+          'average_cpm',
+          'ctr',
+          'all_conversions_from_interactions_rate',
+      ],
+  )
 
   data['customer_id'] = data['customer_id'].astype('string')
 
