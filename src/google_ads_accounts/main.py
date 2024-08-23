@@ -137,6 +137,18 @@ def get_config_from_sheet(sheet_id: str) -> List[Dict[str, Any]]:
       .execute()
       .get('values', [['1']])[0][0]
   )
+  detect_objects = (
+      sheet.values()
+      .get(spreadsheetId=sheet_id, range='detect_objects')
+      .execute()
+      .get('values', [['false']])[0][0]
+  ).lower() == 'true'
+  crop_faces_and_people = (
+      sheet.values()
+      .get(spreadsheetId=sheet_id, range='crop_faces_and_people')
+      .execute()
+      .get('values', [['false']])[0][0]
+  ).lower() == 'true'
 
   gads_filters_str = gads_filters_to_gaql_string(gads_filters)
 
@@ -149,6 +161,8 @@ def get_config_from_sheet(sheet_id: str) -> List[Dict[str, Any]]:
           'customer_id': customer_id,
           'lookback_days': int(lookback_days),
           'gads_filters': gads_filters_str,
+          'detect_objects': detect_objects,
+          'crop_faces_and_people': crop_faces_and_people,
       })
     else:
       logger.info('Ignoring disabled row: %s', customer_id)
