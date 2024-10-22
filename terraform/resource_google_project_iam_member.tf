@@ -16,29 +16,41 @@ resource "google_project_iam_member" "cloud_functions_invoker" {
   project = var.project_id
   role    = "roles/cloudfunctions.invoker"
   member  = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
+  depends_on = [resource.google_service_account.video_exclusion_toolbox]
 }
 resource "google_project_iam_member" "bigquery_job_user" {
   project = var.project_id
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
+  depends_on = [resource.google_service_account.video_exclusion_toolbox]
 }
 resource "google_project_iam_member" "bigquery_data_owner" {
   project = var.project_id
   role    = "roles/bigquery.dataOwner"
   member  = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
+  depends_on = [resource.google_service_account.video_exclusion_toolbox]
 }
 resource "google_project_iam_member" "pubsub_publisher" {
   project = var.project_id
   role    = "roles/pubsub.publisher"
   member  = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
+  depends_on = [resource.google_service_account.video_exclusion_toolbox]
 }
 resource "google_project_iam_member" "storage_object_admin" {
   project = var.project_id
   role    = "roles/storage.objectAdmin"
   member  = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
+  depends_on = [resource.google_service_account.video_exclusion_toolbox]
 }
 resource "google_project_iam_member" "secret_accessor" {
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
+  depends_on = [resource.google_service_account.video_exclusion_toolbox]
+}
+resource "google_project_iam_member" "cloudbuild_builds_builder" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.builder"
+  member  = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
+  depends_on = [resource.google_service_account.video_exclusion_toolbox]
 }

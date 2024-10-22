@@ -16,49 +16,59 @@ data "archive_file" "google_ads_accounts" {
   type        = "zip"
   output_path = ".temp/google_ads_accounts.zip"
   source_dir  = "../src/google_ads_accounts/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_exclusions" {
   type        = "zip"
   output_path = ".temp/google_ads_exclusions.zip"
   source_dir  = "../src/google_ads_exclusions/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_excluder" {
   type        = "zip"
   output_path = ".temp/google_ads_excluder.zip"
   source_dir  = "../src/google_ads_excluder/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_report_video" {
   type        = "zip"
   output_path = ".temp/google_ads_report_video.zip"
   source_dir  = "../src/google_ads_report_video/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_report_channel" {
   type        = "zip"
   output_path = ".temp/google_ads_report_channel.zip"
   source_dir  = "../src/google_ads_report_channel/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_channel" {
   type        = "zip"
   output_path = ".temp/youtube_channel.zip"
   source_dir  = "../src/youtube_channel/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_video" {
   type        = "zip"
   output_path = ".temp/youtube_video.zip"
   source_dir  = "../src/youtube_video/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_thumbnails_dispatch" {
   type        = "zip"
   output_path = ".temp/youtube_thumbnails_dispatch.zip"
   source_dir  = "../src/youtube_thumbnails_dispatch/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_thumbnails_identify_objects" {
   type        = "zip"
   output_path = ".temp/youtube_thumbnails_identify_objects.zip"
   source_dir  = "../src/youtube_thumbnails_identify_objects/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_thumbnails_generate_cropouts" {
   type        = "zip"
   output_path = ".temp/youtube_thumbnails_generate_cropouts.zip"
   source_dir  = "../src/youtube_thumbnails_generate_cropouts/"
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
