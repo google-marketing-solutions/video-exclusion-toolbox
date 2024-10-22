@@ -24,7 +24,7 @@ Read more about [Google Cloud roles here](
 https://cloud.google.com/iam/docs/understanding-roles).
 
 ## OAuth
-The project uses OAauth2.0 scopes and service account roles to manage
+The project uses OAuth 2.0 scopes and service account roles to manage
 permissions. These are the scopes that are required when generating a refresh
 token.
 
@@ -86,7 +86,8 @@ These changes need to be done once manually, as they are not controlled by Terra
       sheets.googleapis.com \
       cloudscheduler.googleapis.com \
       secretmanager.googleapis.com \
-      vision.googleapis.com
+      vision.googleapis.com \
+      pubsub.googleapis.com
    ```
 
 _Side note_: If you're interested in the reason why the APIs aren't controlled
