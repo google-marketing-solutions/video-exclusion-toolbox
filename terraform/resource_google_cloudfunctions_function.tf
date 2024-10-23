@@ -20,10 +20,15 @@ resource "google_cloudfunctions_function" "google_ads_accounts" {
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.google_ads_accounts.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 1024
   entry_point           = "main"
   trigger_http          = true
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.google_ads_accounts
+  ]
 
   environment_variables = {
     GOOGLE_CLOUD_PROJECT              = var.project_id
@@ -40,9 +45,14 @@ resource "google_cloudfunctions_function" "google_ads_exclusions" {
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.google_ads_exclusions.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 4096
   entry_point           = "main"
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.google_ads_exclusions
+  ]
 
   event_trigger {
     event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
@@ -88,9 +98,14 @@ resource "google_cloudfunctions_function" "google_ads_report_video" {
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.google_ads_report_video.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 4096
   entry_point           = "main"
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.google_ads_report_video
+  ]
 
   event_trigger {
     event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
@@ -137,9 +152,14 @@ resource "google_cloudfunctions_function" "google_ads_report_channel" {
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.google_ads_report_channel.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 4096
   entry_point           = "main"
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.google_ads_report_channel
+  ]
 
   event_trigger {
     event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
@@ -186,9 +206,14 @@ resource "google_cloudfunctions_function" "youtube_channel" {
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.youtube_channel.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 4096
   entry_point           = "main"
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.youtube_channel
+  ]
 
   event_trigger {
     event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
@@ -210,9 +235,14 @@ resource "google_cloudfunctions_function" "youtube_video" {
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.youtube_video.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 4096
   entry_point           = "main"
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.youtube_video
+  ]
 
   event_trigger {
     event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
@@ -234,9 +264,14 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_dispatch" {
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.youtube_thumbnails_dispatch.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 4096
   entry_point           = "main"
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.youtube_thumbnails_dispatch
+  ]
 
   event_trigger {
     event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
@@ -247,6 +282,7 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_dispatch" {
     GOOGLE_CLOUD_PROJECT                = var.project_id
     VID_EXCL_THUMBNAIL_PROCESSING_TOPIC = google_pubsub_topic.youtube_thumbnails_to_process.name
     VID_EXCL_BIGQUERY_DATASET           = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+    ENABLE_VISION_PROCESSING            = var.enable_vision_processing
   }
 }
 
@@ -259,9 +295,14 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_identify_objects" 
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.youtube_thumbnails_identify_objects.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 1024
   entry_point           = "main"
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.youtube_thumbnails_identify_objects
+  ]
 
   event_trigger {
     event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
@@ -285,9 +326,14 @@ resource "google_cloudfunctions_function" "youtube_thumbnails_generate_cropouts"
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.youtube_thumbnails_generate_cropouts.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 1024
   entry_point           = "main"
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.youtube_thumbnails_generate_cropouts
+  ]
 
   event_trigger {
     event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
@@ -309,10 +355,15 @@ resource "google_cloudfunctions_function" "google_ads_excluder" {
   source_archive_bucket = google_storage_bucket.source_archive.name
   source_archive_object = google_storage_bucket_object.google_ads_excluder.name
   service_account_email = google_service_account.video_exclusion_toolbox.email
+  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
   timeout               = 540
   available_memory_mb   = 4096
   entry_point           = "main"
   trigger_http          = true
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.google_ads_excluder
+  ]
 
   environment_variables = {
     GOOGLE_ADS_USE_PROTO_PLUS    = false

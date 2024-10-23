@@ -70,3 +70,9 @@ variable "crop_objects" {
   description = "Switch whether to crop the objects detected in a thumbnail."
   default     = true
 }
+
+variable "enable_vision_processing" {
+  type        = bool
+  description = "Switch whether to use vision processing on thumbnails."
+  default     = false
+}
