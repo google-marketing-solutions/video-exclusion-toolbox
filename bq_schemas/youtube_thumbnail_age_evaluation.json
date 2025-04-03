@@ -1,0 +1,42 @@
+[
+  {
+    "name": "video_id",
+    "mode": "REQUIRED",
+    "type": "STRING"
+  },
+  {
+    "name": "video_title",
+    "mode": "NULLABLE",
+    "type": "STRING"
+  },
+  {
+    "name": "evaluated_description",
+    "mode": "NULLABLE",
+    "type": "STRING"
+  },
+  {
+    "name": "evaluated_age",
+    "mode": "NULLABLE",
+    "type": "INTEGER"
+  },
+  {
+    "name": "thumbnail_url",
+    "mode": "NULLABLE",
+    "type": "STRING"
+  },
+  {
+    "name": "video_url",
+    "mode": "NULLABLE",
+    "type": "STRING"
+  },
+  {
+    "name": "evaluation_model_id",
+    "mode": "NULLABLE",
+    "type": "STRING"
+  },
+  {
+    "name": "datetime_updated",
+    "mode": "REQUIRED",
+    "type": "TIMESTAMP"
+  }
+]

@@ -17,6 +17,7 @@ resource "google_storage_bucket" "source_archive" {
   location                    = var.region
   force_destroy               = true
   uniform_bucket_level_access = true
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 
 

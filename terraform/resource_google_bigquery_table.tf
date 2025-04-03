@@ -12,24 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-resource "google_bigquery_table" "youtube_category_lookup" {
-  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  project             = "${var.project_id}"
-  deletion_protection = false
-  depends_on = [
-    resource.google_bigquery_dataset.video_exclusion_toolbox,
-    resource.google_storage_bucket_object.categories_lookup
-  ]
-  external_data_configuration {
-    autodetect    = true
-    source_format = "CSV"
-    source_uris = [
-      "gs://${google_storage_bucket.categories_lookup.name}/categories_lookup.csv"
-    ]
-  }
-  table_id = "YouTubeCategory"
-}
-
+################################# Native BQ tables #############################
 resource "google_bigquery_table" "google_ads_report_video" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
@@ -123,6 +106,33 @@ resource "google_bigquery_table" "channels_with_matched_keywords" {
   schema              = file("../bq_schemas/channels_with_matched_keywords.json")
 }
 
+resource "google_bigquery_table" "youtube_thumbnail_age_evaluation" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "youtube_thumbnail_age_evaluation"
+  deletion_protection = false
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  schema              = file("../bq_schemas/youtube_thumbnail_age_evaluation.json")
+}
+
+############################## External BQ Tables ##############################
+resource "google_bigquery_table" "youtube_category_lookup" {
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  project             = "${var.project_id}"
+  deletion_protection = false
+  depends_on = [
+    resource.google_bigquery_dataset.video_exclusion_toolbox,
+    resource.google_storage_bucket_object.categories_lookup
+  ]
+  external_data_configuration {
+    autodetect    = true
+    source_format = "CSV"
+    source_uris = [
+      "gs://${google_storage_bucket.categories_lookup.name}/categories_lookup.csv"
+    ]
+  }
+  table_id = "YouTubeCategory"
+}
 
 resource "google_bigquery_table" "exclusion_keywords" {
   project             = "${var.project_id}"
@@ -144,6 +154,7 @@ resource "google_bigquery_table" "exclusion_keywords" {
   }
 }
 
+#################################### Views #####################################
 resource "google_bigquery_table" "ads_and_youtube" {
   project             = "${var.project_id}"
   table_id            = "AdsAndYouTube"

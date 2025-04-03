@@ -20,7 +20,7 @@ import os
 import sys
 from typing import Any, Dict, Optional, Tuple
 
-from google.ads.googleads.client import GoogleAdsClient
+from google.ads.googleads import client as googleads_client
 from google.cloud import bigquery
 from google.cloud import pubsub_v1
 import jsonschema
@@ -54,6 +54,8 @@ message_schema = {
         'gads_filters',
     ],
 }
+
+GOOGLE_ADS_CLIENT_VERSION = 'v18'
 # BQ Table name to store the Google Ads channel placement report. This is not
 # expected to be configurable and so is not exposed as an environmental variable
 BIGQUERY_TABLE_NAME = 'GoogleAdsReportChannel'
@@ -166,7 +168,9 @@ def _get_video_placement_report(
       A Pandas DataFrame containing the report results.
   """
   logger.info('Getting report stream for %s', customer_id)
-  client = GoogleAdsClient.load_from_env(version='v14')
+  client = googleads_client.GoogleAdsClient.load_from_env(
+      version=GOOGLE_ADS_CLIENT_VERSION
+  )
   ga_service = client.get_service('GoogleAdsService')
 
   query = get_report_query(lookback_days, gads_filters)

@@ -18,6 +18,12 @@ locals {
         "sheet_id": "${var.config_sheet_id}"
     }
     EOF
+  evaluate_thumbnail_age_scheduler_body = <<EOF
+    {
+        "sheet_id": "${var.config_sheet_id}",
+        "processing_limit": "${var.age_evaluation_processing_limit}"
+    }
+    EOF
 }
 
 resource "google_cloud_scheduler_job" "video_exclusion_toolbox_run_process" {
@@ -36,6 +42,29 @@ resource "google_cloud_scheduler_job" "video_exclusion_toolbox_run_process" {
       "Content-Type" = "application/json"
     }
     oidc_token {
+      service_account_email = google_service_account.video_exclusion_toolbox.email
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "vet_evaluate_thumbnail_age" {
+  name             = "vet-evaluate-thumbnail-age"
+  description      = "Kicks off the thumbnail age evaluation process."
+  schedule         = "10,40 * * * *"
+  time_zone        = "Etc/UTC"
+  attempt_deadline = "320s"
+  region           = var.region
+
+  http_target {
+    http_method = "POST"
+    uri         = google_cloudfunctions2_function.youtube_thumbnails_evaluate_age_dispatcher.service_config[0].uri
+    body        = base64encode(local.evaluate_thumbnail_age_scheduler_body)
+    headers = {
+      "Content-Type" = "application/json",
+      "User-Agent" = "Google-Cloud-Scheduler"
+    }
+    oidc_token {
+      audience              = "${google_cloudfunctions2_function.youtube_thumbnails_evaluate_age_dispatcher.service_config[0].uri}/"
       service_account_email = google_service_account.video_exclusion_toolbox.email
     }
   }
