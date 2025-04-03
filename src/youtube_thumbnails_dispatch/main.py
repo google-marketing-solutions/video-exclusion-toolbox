@@ -42,6 +42,7 @@ BQ_DATASET = os.environ.get('VID_EXCL_BIGQUERY_DATASET')
 THUMBNAIL_PROCESSING_TOPIC = os.environ.get(
     'VID_EXCL_THUMBNAIL_PROCESSING_TOPIC'
 )
+ENABLE_VISION_PROCESSING = os.environ.get('ENABLE_VISION_PROCESSING')
 
 # The schema of the JSON in the event payload.
 message_schema = {
@@ -85,9 +86,11 @@ def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
   # Will raise jsonschema.exceptions.ValidationError if the schema is invalid
   jsonschema.validate(instance=message_json, schema=message_schema)
 
-  run(date_partition=message_json.get('date_partition'))
-
-  logger.info('Done dispatching video_ids for thumbnail processing.')
+  if ENABLE_VISION_PROCESSING == 'true':
+    run(date_partition=message_json.get('date_partition'))
+    logger.info('Done dispatching video_ids for thumbnail processing.')
+  else:
+    logger.info('Vision processing is disabled, skipping thumbnail processing.')
 
 
 def run(date_partition: str) -> None:
@@ -144,7 +147,7 @@ def _publish_videos_as_batch(
 
   # Resolve the publish future in a separate thread.
   def callback(
-      data: str,
+      data: bytes,
       current: int,
       total: int,
       topic_path: str,

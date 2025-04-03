@@ -13,7 +13,7 @@ For deployment steps, see the [deployment guide](docs/deployment.md).
 
 If your use case is to automatically exclude spam channels, please refer to the
 [Ads Placement Excluder](https://github.com/google/ads-placement-excluder)
-solution, which was used as a the base structure for this project.
+solution, which was used as a the base structure for Video Exclusion Toolbox.
 
 ## Disclaimers
 __This is not an officially supported Google product.__

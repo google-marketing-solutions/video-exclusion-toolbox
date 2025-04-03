@@ -14,6 +14,10 @@ The project creates a service account with the following roles:
 - `roles/bigquery.dataEditor`
 - `roles/pubsub.publisher`
 - `roles/storage.objectAdmin`
+- `roles/secretmanager.secretAccessor`
+- `roles/cloudbuild.builds.builder`
+- `roles/run.invoker`
+- `roles/aiplatform.user`
 
 As a user deploying the project, you will require these roles and the following:
 
@@ -24,7 +28,7 @@ Read more about [Google Cloud roles here](
 https://cloud.google.com/iam/docs/understanding-roles).
 
 ## OAuth
-The project uses OAauth2.0 scopes and service account roles to manage
+The project uses OAuth 2.0 scopes and service account roles to manage
 permissions. These are the scopes that are required when generating a refresh
 token.
 
@@ -46,18 +50,26 @@ https://www.googleapis.com/auth/drive
 - A Google Ads [Developer Token](
   https://developers.google.com/google-ads/api/docs/first-call/dev-token)
 
-
 ## Deployment
 
 ### Manual Steps
-These changes need to be done once manually, as they are not controlled by Terraform:
+These changes need to be done once manually, as they are not controlled by
+Terraform:
 
-1. If you want to use the sample Looker Studio dashboard to display the data, 
-   request access to [this dashboard](https://lookerstudio.google.com/c/reporting/2194043e-84bb-432b-b3e6-0553369745be). The deployment process will prompt you to create a copy of it later on. Once you've been granted access, proceed with the next step. This is optional and you can create your own dashboards to connect to the BigQuery datasets.
+1. If you want to use the sample Looker Studio dashboard to display the data,
+request access to
+[this dashboard](https://lookerstudio.google.com/c/reporting/2194043e-84bb-432b-b3e6-0553369745be).
+The deployment process will prompt you to create a copy of it later on.
+Once you've been granted access, proceed with the next step.
+This is optional and you can create your own dashboards to connect to the
+BigQuery datasets.
+
 1. Open the Google Cloud Project in the UI.
+
 1. Go to [Cloud Storage](https://console.cloud.google.com/storage/browser) and
    create a new bucket, which will be used to keep track of the Terraform state,
    e.g. `my-awesome-project-terraform`. Make a note of the name of the bucket.
+   
 1. Open the [OAuth Consent Screen](
    https://console.cloud.google.com/apis/credentials/consent) and create a new
    internal app.
@@ -86,7 +98,11 @@ These changes need to be done once manually, as they are not controlled by Terra
       sheets.googleapis.com \
       cloudscheduler.googleapis.com \
       secretmanager.googleapis.com \
-      vision.googleapis.com
+      vision.googleapis.com \
+      pubsub.googleapis.com \
+      run.googleapis.com \
+      eventarc.googleapis.com \
+      aiplatform.googleapis.com
    ```
 
 _Side note_: If you're interested in the reason why the APIs aren't controlled
@@ -123,9 +139,9 @@ https://medium.com/rockedscience/how-to-fully-automate-the-deployment-of-google-
 1. The email of the service account created will be output, give view only
    access to the Google sheet containing the config.
 
-By default, the code will be triggered every hour by Cloud Scheduler. You can run it less often by updating the Cloud Scheduler trigger.
+By default, the code will be triggered every hour by Cloud Scheduler. You can
+run it less often by updating the Cloud Scheduler trigger.
 To test everything is working, configure the Google Sheet ([see below](#google-sheet)) and force run the Cloud Scheduler job in the UI.
-
 
 ## Google Sheet
 

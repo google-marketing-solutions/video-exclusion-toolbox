@@ -70,3 +70,33 @@ variable "crop_objects" {
   description = "Switch whether to crop the objects detected in a thumbnail."
   default     = true
 }
+
+variable "enable_vision_processing" {
+  type        = bool
+  description = "Switch whether to use vision processing on thumbnails."
+  default     = false
+}
+
+variable "enable_age_evaluation" {
+  type        = bool
+  description = "Switch whether to enable age evaluation on thumbnails."
+  default     = false
+}
+
+variable "age_evaluation_gemini_model" {
+  type        = string
+  description = "The Gemini model to use for age evaluation."
+  default     = "gemini-2.0-flash-001"
+}
+
+variable "age_evaluation_gemini_location" {
+  type        = string
+  description = "The location of the Gemini model to use for age evaluation."
+  default     = "europe-west1"
+}
+
+variable "age_evaluation_processing_limit" {
+  type        = number
+  description = "The number of videos to process for age evaluation in one batch."
+  default     = 1000
+}

@@ -1,0 +1,8 @@
+db-dtypes==1.4.2
+google-api-python-client==2.165.0
+google-auth==2.38.0
+google-cloud-bigquery==3.30.0
+google-cloud-logging==3.11.4
+google-cloud-pubsub==2.29.0
+jsonschema==4.23.0
+pandas==2.2.3
