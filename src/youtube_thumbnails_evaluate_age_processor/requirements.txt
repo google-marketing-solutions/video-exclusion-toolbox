@@ -3,4 +3,4 @@ google-cloud-logging==3.11.4
 google-genai==1.7.0
 jsonschema==4.23.0
 pydantic==2.10.6
-requests==2.32.3
+requests==2.33.0
