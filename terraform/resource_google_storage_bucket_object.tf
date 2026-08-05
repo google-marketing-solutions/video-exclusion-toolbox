@@ -13,109 +13,109 @@
 # limitations under the License.
 
 ######################## Source Code Archive Objects ###########################
-resource "google_storage_bucket_object" "google_ads_accounts" {
-  name       = "google_ads_accounts_${data.archive_file.google_ads_accounts.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.google_ads_accounts.output_path
+resource "google_storage_bucket_object" "gads_account_dispatcher" {
+  name   = "gads-account-dispatcher-${data.archive_file.gads_account_dispatcher.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.gads_account_dispatcher.output_path
   depends_on = [
-    data.archive_file.google_ads_accounts,
+    data.archive_file.gads_account_dispatcher,
     resource.google_storage_bucket.source_archive
   ]
 }
-resource "google_storage_bucket_object" "google_ads_exclusions" {
-  name       = "google_ads_exclusions_${data.archive_file.google_ads_exclusions.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.google_ads_exclusions.output_path
+resource "google_storage_bucket_object" "google_ads_exclusions_fetcher" {
+  name   = "google-ads-exclusions-fetcher-${data.archive_file.google_ads_exclusions_fetcher.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.google_ads_exclusions_fetcher.output_path
   depends_on = [
-    data.archive_file.google_ads_exclusions,
+    data.archive_file.google_ads_exclusions_fetcher,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "google_ads_excluder" {
-  name       = "google_ads_excluder_${data.archive_file.google_ads_excluder.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.google_ads_excluder.output_path
+  name   = "google_ads_excluder_${data.archive_file.google_ads_excluder.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.google_ads_excluder.output_path
   depends_on = [
     data.archive_file.google_ads_excluder,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "google_ads_report_video" {
-  name       = "google_ads_report_video${data.archive_file.google_ads_report_video.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.google_ads_report_video.output_path
+  name   = "google_ads_report_video${data.archive_file.google_ads_report_video.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.google_ads_report_video.output_path
   depends_on = [
     data.archive_file.google_ads_report_video,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "google_ads_report_channel" {
-  name       = "google_ads_report_channel${data.archive_file.google_ads_report_channel.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.google_ads_report_channel.output_path
+  name   = "google_ads_report_channel${data.archive_file.google_ads_report_channel.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.google_ads_report_channel.output_path
   depends_on = [
     data.archive_file.google_ads_report_channel,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "youtube_channel" {
-  name       = "youtube_channel_${data.archive_file.youtube_channel.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.youtube_channel.output_path
+  name   = "youtube_channel_${data.archive_file.youtube_channel.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.youtube_channel.output_path
   depends_on = [
     data.archive_file.youtube_channel,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "youtube_video" {
-  name       = "youtube_video_${data.archive_file.youtube_video.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.youtube_video.output_path
+  name   = "youtube_video_${data.archive_file.youtube_video.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.youtube_video.output_path
   depends_on = [
     data.archive_file.youtube_video,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "youtube_thumbnails_dispatch" {
-  name       = "youtube_thumbnails_dispatch_${data.archive_file.youtube_thumbnails_dispatch.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.youtube_thumbnails_dispatch.output_path
+  name   = "youtube_thumbnails_dispatch_${data.archive_file.youtube_thumbnails_dispatch.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.youtube_thumbnails_dispatch.output_path
   depends_on = [
     data.archive_file.youtube_thumbnails_dispatch,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "youtube_thumbnails_identify_objects" {
-  name       = "youtube_thumbnails_process_${data.archive_file.youtube_thumbnails_identify_objects.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.youtube_thumbnails_identify_objects.output_path
+  name   = "youtube_thumbnails_process_${data.archive_file.youtube_thumbnails_identify_objects.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.youtube_thumbnails_identify_objects.output_path
   depends_on = [
     data.archive_file.youtube_thumbnails_identify_objects,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "youtube_thumbnails_generate_cropouts" {
-  name       = "youtube_thumbnails_generate_cropouts_${data.archive_file.youtube_thumbnails_generate_cropouts.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.youtube_thumbnails_generate_cropouts.output_path
+  name   = "youtube_thumbnails_generate_cropouts_${data.archive_file.youtube_thumbnails_generate_cropouts.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.youtube_thumbnails_generate_cropouts.output_path
   depends_on = [
     data.archive_file.youtube_thumbnails_generate_cropouts,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "youtube_thumbnails_evaluate_age_dispatcher" {
-  name       = "youtube_thumbnails_evaluate_age_dispatcher_${data.archive_file.youtube_thumbnails_evaluate_age_dispatcher.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.youtube_thumbnails_evaluate_age_dispatcher.output_path
+  name   = "youtube_thumbnails_evaluate_age_dispatcher_${data.archive_file.youtube_thumbnails_evaluate_age_dispatcher.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.youtube_thumbnails_evaluate_age_dispatcher.output_path
   depends_on = [
     data.archive_file.youtube_thumbnails_evaluate_age_dispatcher,
     resource.google_storage_bucket.source_archive
   ]
 }
 resource "google_storage_bucket_object" "youtube_thumbnails_evaluate_age_processor" {
-  name       = "youtube_thumbnails_evaluate_age_processor_${data.archive_file.youtube_thumbnails_evaluate_age_processor.output_md5}.zip"
-  bucket     = google_storage_bucket.source_archive.name
-  source     = data.archive_file.youtube_thumbnails_evaluate_age_processor.output_path
+  name   = "youtube_thumbnails_evaluate_age_processor_${data.archive_file.youtube_thumbnails_evaluate_age_processor.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.youtube_thumbnails_evaluate_age_processor.output_path
   depends_on = [
     data.archive_file.youtube_thumbnails_evaluate_age_processor,
     resource.google_storage_bucket.source_archive
@@ -124,8 +124,8 @@ resource "google_storage_bucket_object" "youtube_thumbnails_evaluate_age_process
 
 ########################## Auxiliary Bucket Objects ############################
 resource "google_storage_bucket_object" "categories_lookup" {
-  name          = "categories_lookup.csv"
-  bucket        = google_storage_bucket.categories_lookup.name
-  source        = "../src/categories_lookup.csv"
-  content_type  = "text/plain"
+  name         = "categories_lookup.csv"
+  bucket       = google_storage_bucket.categories_lookup.name
+  source       = "../src/categories_lookup.csv"
+  content_type = "text/plain"
 }

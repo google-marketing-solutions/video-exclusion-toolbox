@@ -12,89 +12,119 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-data "archive_file" "google_ads_accounts" {
+data "archive_file" "gads_account_dispatcher" {
   type        = "zip"
-  output_path = ".temp/google_ads_accounts.zip"
-  source_dir  = "../src/google_ads_accounts/"
+  output_path = ".temp/gads_account_dispatcher.zip"
+  source {
+    content  = file("../src/google-ads-accounts-dispatcher/main.py")
+    filename = "main.py"
+  }
+  source {
+    content  = "${file("../src/common_requirements.txt")}\n${file("../src/google-ads-accounts-dispatcher/requirements.txt")}"
+    filename = "requirements.txt"
+  }
+  source {
+    content  = file("../src/vet_common/__init__.py")
+    filename = "vet_common/__init__.py"
+  }
+  source {
+    content  = file("../src/vet_common/logging.py")
+    filename = "vet_common/logging.py"
+  }
+  source {
+    content  = file("../src/vet_common/pubsub.py")
+    filename = "vet_common/pubsub.py"
+  }
+  source {
+    content  = file("../src/vet_common/ids.py")
+    filename = "vet_common/ids.py"
+  }
   depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
-data "archive_file" "google_ads_exclusions" {
+data "archive_file" "google_ads_exclusions_fetcher" {
   type        = "zip"
-  output_path = ".temp/google_ads_exclusions.zip"
-  source_dir  = "../src/google_ads_exclusions/"
+  output_path = ".temp/google-ads-exclusions-fetcher.zip"
+  source {
+    content  = file("../src/google-ads-exclusions-fetcher/main.py")
+    filename = "main.py"
+  }
+  source {
+    content  = file("../src/google-ads-exclusions-fetcher/requirements.txt")
+    filename = "requirements.txt"
+  }
   depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_excluder" {
   type        = "zip"
   output_path = ".temp/google_ads_excluder.zip"
   source_dir  = "../src/google_ads_excluder/"
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
+  depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_report_video" {
   type        = "zip"
   output_path = ".temp/google_ads_report_video.zip"
   source_dir  = "../src/google_ads_report_video/"
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
+  depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_report_channel" {
   type        = "zip"
   output_path = ".temp/google_ads_report_channel.zip"
   source_dir  = "../src/google_ads_report_channel/"
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
+  depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_channel" {
   type        = "zip"
   output_path = ".temp/youtube_channel.zip"
   source_dir  = "../src/youtube_channel/"
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
+  depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_video" {
   type        = "zip"
   output_path = ".temp/youtube_video.zip"
   source_dir  = "../src/youtube_video/"
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
+  depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_thumbnails_dispatch" {
   type        = "zip"
   output_path = ".temp/youtube_thumbnails_dispatch.zip"
   source_dir  = "../src/youtube_thumbnails_dispatch/"
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
+  depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_thumbnails_identify_objects" {
   type        = "zip"
   output_path = ".temp/youtube_thumbnails_identify_objects.zip"
   source_dir  = "../src/youtube_thumbnails_identify_objects/"
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
+  depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_thumbnails_generate_cropouts" {
   type        = "zip"
   output_path = ".temp/youtube_thumbnails_generate_cropouts.zip"
   source_dir  = "../src/youtube_thumbnails_generate_cropouts/"
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
+  depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 
 data "archive_file" "youtube_thumbnails_evaluate_age_dispatcher" {
   type        = "zip"
   output_path = ".temp/youtube_thumbnails_evaluate_age_dispatcher.zip"
   source {
-    content = file("../src/youtube_thumbnails_evaluate_age_dispatcher/main.py")
+    content  = file("../src/youtube_thumbnails_evaluate_age_dispatcher/main.py")
     filename = "main.py"
   }
   source {
-    content = file("../src/youtube_thumbnails_evaluate_age_dispatcher/requirements.txt")
+    content  = file("../src/youtube_thumbnails_evaluate_age_dispatcher/requirements.txt")
     filename = "requirements.txt"
   }
-  depends_on  = [resource.google_project_iam_member.storage_object_admin]
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_thumbnails_evaluate_age_processor" {
   type        = "zip"
   output_path = ".temp/youtube_thumbnails_evaluate_age_processor.zip"
   source {
-    content = file("../src/youtube_thumbnails_evaluate_age_processor/main.py")
+    content  = file("../src/youtube_thumbnails_evaluate_age_processor/main.py")
     filename = "main.py"
   }
   source {
-    content = file("../src/youtube_thumbnails_evaluate_age_processor/requirements.txt")
+    content  = file("../src/youtube_thumbnails_evaluate_age_processor/requirements.txt")
     filename = "requirements.txt"
   }
   depends_on = [resource.google_project_iam_member.storage_object_admin]
