@@ -66,7 +66,7 @@ resource "google_bigquery_table" "youtube_video" {
   schema              = file("../bq_schemas/youtube_video.json")
 }
 
-resource "google_bigquery_table" "youtube_thubmnails" {
+resource "google_bigquery_table" "youtube_thumbnails" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeThumbnailsWithAnnotations"
@@ -75,7 +75,7 @@ resource "google_bigquery_table" "youtube_thubmnails" {
   schema              = file("../bq_schemas/youtube_thumbnail_annotation.json")
 }
 
-resource "google_bigquery_table" "youtube_thubmnail_cropouts" {
+resource "google_bigquery_table" "youtube_thumbnail_cropouts" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeThumbnailCropouts"
@@ -313,7 +313,7 @@ resource "google_bigquery_table" "videos_to_exclude" {
     google_bigquery_table.videos_with_matched_keywords
   ]
   view {
-    query = <<-EOT
+    query          = <<-EOT
       SELECT
         DISTINCT video_id, video_url, title, description, tags,
         CONCAT(
@@ -340,7 +340,7 @@ resource "google_bigquery_table" "channels_to_exclude" {
     google_bigquery_table.channels_with_matched_keywords
   ]
   view {
-    query = <<-EOT
+    query          = <<-EOT
       SELECT
         DISTINCT channel_id, channel_url, title,
         CONCAT('Found: [', title_match, '] in title') as reason
@@ -360,7 +360,7 @@ resource "google_bigquery_table" "video_keyword_statistics" {
     google_bigquery_table.videos_with_matched_keywords
   ]
   view {
-    query = <<-EOT
+    query          = <<-EOT
       WITH exploded_table AS (
         SELECT
           SPLIT(title_match, ',') AS title_words,
@@ -412,7 +412,7 @@ resource "google_bigquery_table" "channel_keyword_statistics" {
     google_bigquery_dataset.video_exclusion_toolbox,
   ]
   view {
-    query = <<-EOT
+    query          = <<-EOT
       WITH exploded_table AS (
         SELECT
           SPLIT(title_match, ',') AS title_words

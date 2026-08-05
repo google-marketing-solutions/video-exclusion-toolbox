@@ -13,7 +13,7 @@
 # limitations under the License.
 
 locals {
-  scheduler_body = <<EOF
+  scheduler_body                        = <<EOF
     {
         "sheet_id": "${var.config_sheet_id}"
     }
@@ -26,9 +26,9 @@ locals {
     EOF
 }
 
-resource "google_cloud_scheduler_job" "video_exclusion_toolbox_run_process" {
-  name             = "video_exclusion_toolbox"
-  description      = "Run the Video Exclusion Toolbox"
+resource "google_cloud_scheduler_job" "gads_dispatch_accounts" {
+  name             = "vet-gads-dispatch-accounts-job"
+  description      = "Dispatches Google Ads accounts for processing."
   schedule         = "0 * * * *"
   time_zone        = "Etc/UTC"
   attempt_deadline = "320s"
@@ -36,12 +36,13 @@ resource "google_cloud_scheduler_job" "video_exclusion_toolbox_run_process" {
 
   http_target {
     http_method = "POST"
-    uri         = google_cloudfunctions_function.google_ads_accounts.https_trigger_url
+    uri         = google_cloudfunctions2_function.gads_account_dispatcher.service_config[0].uri
     body        = base64encode(local.scheduler_body)
     headers = {
       "Content-Type" = "application/json"
     }
     oidc_token {
+      audience              = "${google_cloudfunctions2_function.gads_account_dispatcher.service_config[0].uri}/"
       service_account_email = google_service_account.video_exclusion_toolbox.email
     }
   }
@@ -60,8 +61,7 @@ resource "google_cloud_scheduler_job" "vet_evaluate_thumbnail_age" {
     uri         = google_cloudfunctions2_function.youtube_thumbnails_evaluate_age_dispatcher.service_config[0].uri
     body        = base64encode(local.evaluate_thumbnail_age_scheduler_body)
     headers = {
-      "Content-Type" = "application/json",
-      "User-Agent" = "Google-Cloud-Scheduler"
+      "Content-Type" = "application/json"
     }
     oidc_token {
       audience              = "${google_cloudfunctions2_function.youtube_thumbnails_evaluate_age_dispatcher.service_config[0].uri}/"

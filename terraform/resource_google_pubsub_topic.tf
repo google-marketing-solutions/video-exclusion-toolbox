@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-resource "google_pubsub_topic" "google_ads_account" {
-  name                       = "vid-excl-google-ads-account"
+resource "google_pubsub_topic" "gads_account" {
+  name                       = "vet-gads-account-queue"
   message_retention_duration = "604800s"
 }
 
