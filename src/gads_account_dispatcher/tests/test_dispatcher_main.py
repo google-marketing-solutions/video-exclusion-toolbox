@@ -1,4 +1,4 @@
-"""Unit tests for google-ads-accounts-dispatcher main module."""
+"""Unit tests for gads_account_dispatcher main module."""
 
 # pylint: disable=protected-access
 
@@ -9,6 +9,7 @@ import sys
 from unittest import mock
 
 import flask
+import google.auth.credentials
 
 _project_dir = pathlib.Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location(
@@ -37,7 +38,10 @@ def test_gads_filters_to_gaql_string_empty_list_returns_empty_string():
 def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
     mock_auth_default, mock_build
 ):
-  mock_creds = mock.Mock()
+  """Tests successfully fetching customer configurations from a valid sheet."""
+  mock_creds = mock.create_autospec(
+      google.auth.credentials.Credentials, instance=True
+  )
   mock_creds.universe_domain = 'googleapis.com'
   mock_auth_default.return_value = (mock_creds, 'test_project')
   mock_sheets_service = mock.Mock()
@@ -46,6 +50,24 @@ def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
   mock_spreadsheets = mock.Mock()
   mock_sheets_service.spreadsheets.return_value = mock_spreadsheets
 
+  # Input IDs contain hyphens; expected IDs should be sanitized without hyphens.
+  raw_customer_id_1 = '123-456-7890'
+  expected_customer_id_1 = '1234567890'
+  raw_mcc_id_1 = '999-888-7777'
+  expected_mcc_id_1 = '9998887777'
+
+  raw_customer_id_2 = '356-029-6721'
+  expected_customer_id_2 = '3560296721'
+
+  raw_filter_row = ['clicks', '>', '5']
+  expected_gads_filters = 'metrics.clicks > 5'
+
+  raw_lookback_days = '90'
+  expected_lookback_days = 90
+
+  raw_configuration = [['foo', 'bar'], ['baz', 'qux']]
+  expected_settings = {'foo': 'bar', 'baz': 'qux'}
+
   def values_get_side_effect(**kwargs):
     """Mock side effect for spreadsheets.values.get."""
     mock_execute = mock.Mock()
@@ -53,20 +75,18 @@ def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
     if range_name == 'google_ads_customer_ids':
       mock_execute.execute.return_value = {
           'values': [
-              ['123-456-7890', 'Enabled', '999-888-7777'],
+              [raw_customer_id_1, 'Enabled', raw_mcc_id_1],
               ['111-222-3333', 'Disabled', '444-555-6666'],
               ['723-928-2798', 'Disabled'],
-              ['356-029-6721', 'Enabled'],
+              [raw_customer_id_2, 'Enabled'],
           ]
       }
     elif range_name == 'google_ads_filters':
-      mock_execute.execute.return_value = {'values': [['clicks', '>', '5']]}
+      mock_execute.execute.return_value = {'values': [raw_filter_row]}
     elif range_name == 'google_ads_lookback_days':
-      mock_execute.execute.return_value = {'values': [['90']]}
+      mock_execute.execute.return_value = {'values': [[raw_lookback_days]]}
     elif range_name == 'configuration':
-      mock_execute.execute.return_value = {
-          'values': [['foo', 'bar'], ['baz', 'qux']]
-      }
+      mock_execute.execute.return_value = {'values': raw_configuration}
     return mock_execute
 
   mock_spreadsheets.values.return_value.get.side_effect = values_get_side_effect
@@ -76,19 +96,19 @@ def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
   assert len(result) == 2
   assert result[0] == {
       'sheet_id': 'test_sheet_123',
-      'customer_id': '1234567890',
-      'mcc_for_exclusions': '9998887777',
-      'lookback_days': 90,
-      'gads_filters': 'metrics.clicks > 5',
-      'settings': {'foo': 'bar', 'baz': 'qux'},
+      'customer_id': expected_customer_id_1,
+      'mcc_for_exclusions': expected_mcc_id_1,
+      'lookback_days': expected_lookback_days,
+      'gads_filters': expected_gads_filters,
+      'settings': expected_settings,
   }
   assert result[1] == {
       'sheet_id': 'test_sheet_123',
-      'customer_id': '3560296721',
+      'customer_id': expected_customer_id_2,
       'mcc_for_exclusions': '',
-      'lookback_days': 90,
-      'gads_filters': 'metrics.clicks > 5',
-      'settings': {'foo': 'bar', 'baz': 'qux'},
+      'lookback_days': expected_lookback_days,
+      'gads_filters': expected_gads_filters,
+      'settings': expected_settings,
   }
 
 
@@ -97,7 +117,10 @@ def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
 def test_get_config_from_sheet_empty_lookback_days_defaults_to_1(
     mock_auth_default, mock_build
 ):
-  mock_creds = mock.Mock()
+  """Tests that lookback_days defaults to 1 when the sheet range is empty."""
+  mock_creds = mock.create_autospec(
+      google.auth.credentials.Credentials, instance=True
+  )
   mock_creds.universe_domain = 'googleapis.com'
   mock_auth_default.return_value = (mock_creds, 'test_project')
   mock_sheets_service = mock.Mock()
@@ -105,13 +128,17 @@ def test_get_config_from_sheet_empty_lookback_days_defaults_to_1(
   mock_spreadsheets = mock.Mock()
   mock_sheets_service.spreadsheets.return_value = mock_spreadsheets
 
+  raw_customer_id = '123-456-7890'
+  raw_mcc_id = '999-888-7777'
+  default_lookback_days = 1
+
   def values_get_side_effect(**kwargs):
     """Mock side effect for spreadsheets.values.get."""
     mock_execute = mock.Mock()
     range_name = kwargs.get('range')
     if range_name == 'google_ads_customer_ids':
       mock_execute.execute.return_value = {
-          'values': [['1234567890', 'Enabled', '9998887777']]
+          'values': [[raw_customer_id, 'Enabled', raw_mcc_id]]
       }
     elif range_name == 'google_ads_lookback_days':
       mock_execute.execute.return_value = {'values': []}
@@ -123,7 +150,7 @@ def test_get_config_from_sheet_empty_lookback_days_defaults_to_1(
 
   result = main._get_config_from_sheet('test_sheet_123')
   assert len(result) == 1
-  assert result[0]['lookback_days'] == 1
+  assert result[0]['lookback_days'] == default_lookback_days
 
 
 @mock.patch.object(main, 'publish_batch')

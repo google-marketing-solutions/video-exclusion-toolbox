@@ -42,7 +42,7 @@ output "B_run_cloud_scheduler" {
       immediately by running the following command in the Cloud Shell:
 
       --------------------------------------------------------------------------
-      gcloud scheduler jobs run video_exclusion_toolbox --location=${var.region} --project=${var.project_id}
+      gcloud scheduler jobs run ${google_cloud_scheduler_job.gads_dispatch_accounts.name} --location=${var.region} --project=${var.project_id}
       --------------------------------------------------------------------------
 
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

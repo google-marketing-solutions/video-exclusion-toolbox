@@ -16,11 +16,11 @@ data "archive_file" "gads_account_dispatcher" {
   type        = "zip"
   output_path = ".temp/gads_account_dispatcher.zip"
   source {
-    content  = file("../src/google-ads-accounts-dispatcher/main.py")
+    content  = file("../src/gads_account_dispatcher/main.py")
     filename = "main.py"
   }
   source {
-    content  = "${file("../src/common_requirements.txt")}\n${file("../src/google-ads-accounts-dispatcher/requirements.txt")}"
+    content  = "${file("../src/common_requirements.txt")}\n${file("../src/gads_account_dispatcher/requirements.txt")}"
     filename = "requirements.txt"
   }
   source {
