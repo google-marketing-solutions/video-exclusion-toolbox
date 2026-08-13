@@ -18,7 +18,7 @@ import json
 import logging
 import os
 import sys
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from google.ads.googleads import client as googleads_client
 from google.cloud import bigquery
@@ -61,7 +61,7 @@ GOOGLE_ADS_CLIENT_VERSION = 'v18'
 BIGQUERY_TABLE_NAME = 'GoogleAdsReportChannel'
 
 
-def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
+def main(event: dict[str, Any], context: dict[str, Any]) -> None:
   """The entry point: extract the data from the payload and starts the job.
 
   The pub/sub message must match the message_schema object above.
@@ -271,7 +271,7 @@ def get_report_query(
 
 def get_query_dates(
     lookback_days: int, today: datetime = None
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
   """Returns a tuple of string dates in %Y-%m-%d format for the GAds report.
 
   Google Ads queries require a string date in the above format. This function

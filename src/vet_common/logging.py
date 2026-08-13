@@ -28,6 +28,10 @@ def get_service_logger(
 ) -> logging.Logger:
   """Initializes and returns a logger configured for Cloud Run or local testing.
 
+  As a side effect, this function suppresses noisy default logging from
+  third-party client libraries by setting the log level of 'google_genai',
+  'httpx', and 'google.ads.googleads.client' to WARNING.
+
   Args:
       service_name_env: Environment variable name storing the service name.
       default_name: Fallback name if service_name_env is not present.

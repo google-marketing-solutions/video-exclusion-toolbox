@@ -14,6 +14,7 @@
 
 """Asynchronous batch publishing helper for Google Cloud Pub/Sub."""
 
+from collections.abc import Mapping, Sequence
 from concurrent import futures
 import functools
 import json
@@ -26,7 +27,7 @@ from google.cloud import pubsub_v1
 def publish_batch(
     project_id: str,
     topic_id: str,
-    messages: list[dict[str, Any]],
+    messages: Sequence[Mapping[str, Any]],
     logger: Optional[logging.Logger] = None,
     max_messages: int = 100,
 ) -> None:
@@ -35,7 +36,7 @@ def publish_batch(
   Args:
       project_id: The Google Cloud Project containing the Pub/Sub topic.
       topic_id: The name of the topic to publish messages to.
-      messages: A list of message dictionary payloads to publish.
+      messages: A sequence of message mapping payloads to publish.
       logger: Optional Logger instance to log publishing progress and errors.
       max_messages: Maximum number of messages per batch.
   """

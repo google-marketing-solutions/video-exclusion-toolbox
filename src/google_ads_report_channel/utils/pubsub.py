@@ -13,12 +13,12 @@
 # limitations under the License.
 """Utilities for sending messages to Pub/sub."""
 import json
-from typing import Any, Dict
+from typing import Any
 from google.cloud import pubsub_v1
 
 
 def send_dict_to_pubsub(
-    message_dict: Dict[str, Any], topic: str, gcp_project: str
+    message_dict: dict[str, Any], topic: str, gcp_project: str
 ) -> None:
   """Pushes the dictionary to pubsub.
 

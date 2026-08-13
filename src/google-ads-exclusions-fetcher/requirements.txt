@@ -1,0 +1,9 @@
+functions-framework==3.10.2
+db-dtypes==1.4.2
+google-ads==26.0.1
+google-api-python-client==2.198.0
+google-auth==2.38.0
+google-cloud-bigquery==3.31.0
+google-cloud-bigquery-storage==2.30.0
+google-cloud-logging==3.11.4
+jsonschema==4.23.0

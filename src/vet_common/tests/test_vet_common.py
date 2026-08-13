@@ -19,19 +19,28 @@ import os
 from unittest import mock
 
 from google.cloud import pubsub_v1
+import pytest
 from vet_common.ids import sanitize_gads_id
 from vet_common.logging import get_service_logger
 from vet_common.pubsub import publish_batch
 
 
-def test_sanitize_gads_id():
+@pytest.mark.parametrize(
+    ('raw_id', 'expected'),
+    [
+        ('123-456-7890', '1234567890'),
+        (1234567890, '1234567890'),
+        ('  123-456-7890  ', '1234567890'),
+    ],
+)
+def test_sanitize_gads_id_various_formats_returns_sanitized_string(
+    raw_id, expected
+):
   """Test sanitizing Google Ads customer IDs."""
-  assert sanitize_gads_id('123-456-7890') == '1234567890'
-  assert sanitize_gads_id(1234567890) == '1234567890'
-  assert sanitize_gads_id('  123-456-7890  ') == '1234567890'
+  assert sanitize_gads_id(raw_id) == expected
 
 
-def test_get_service_logger_local_test():
+def test_get_service_logger_local_test_returns_service_named_logger():
   """Test logger configuration in local test environment."""
   with mock.patch.dict(
       os.environ, {'IS_LOCAL_TEST': 'True', 'K_SERVICE': 'test-service'}
@@ -41,7 +50,9 @@ def test_get_service_logger_local_test():
 
 
 @mock.patch.object(pubsub_v1, 'PublisherClient', autospec=True)
-def test_publish_batch(mock_publisher_client_cls):
+def test_publish_batch_valid_messages_publishes_all_messages(
+    mock_publisher_client_cls,
+):
   """Test publishing a batch of messages to Pub/Sub."""
   mock_publisher = mock_publisher_client_cls.return_value
   mock_publisher.topic_path.return_value = (

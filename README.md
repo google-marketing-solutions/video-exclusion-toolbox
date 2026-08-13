@@ -18,7 +18,7 @@ solution, which was used as a the base structure for Video Exclusion Toolbox.
 ## Disclaimers
 __This is not an officially supported Google product.__
 
-Copyright 2023 Google LLC. This solution, including any related sample code or
+Copyright 2025 Google LLC. This solution, including any related sample code or
 data, is made available on an “as is,” “as available,” and “with all faults”
 basis, solely for illustrative purposes, and without warranty or representation
 of any kind. This solution is experimental, unsupported and provided solely for

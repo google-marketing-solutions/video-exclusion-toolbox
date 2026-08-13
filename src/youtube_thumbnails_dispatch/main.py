@@ -24,7 +24,7 @@ import json
 import logging
 import os
 import sys
-from typing import Any, Dict
+from typing import Any
 
 from google.cloud import bigquery
 from google.cloud import pubsub_v1
@@ -60,7 +60,7 @@ BQ_SOURCE_TABLE_NAME = 'GoogleAdsReportVideo'
 BQ_TARGET_TABLE_NAME = 'YouTubeThumbnailsWithAnnotations'
 
 
-def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
+def main(event: dict[str, Any], context: dict[str, Any]) -> None:
   """The entry point: extract the data from the payload and starts the job.
 
   The pub/sub message must match the message_schema object above.

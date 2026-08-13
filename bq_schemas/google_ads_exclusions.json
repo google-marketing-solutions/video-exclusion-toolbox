@@ -2,26 +2,31 @@
   {
     "name": "id",
     "type": "STRING",
-    "mode": "NULLABLE"
+    "mode": "REQUIRED"
   },
   {
     "name": "exclusion_list",
     "type": "STRING",
-    "mode": "NULLABLE"
+    "mode": "REQUIRED"
   },
   {
     "name": "exclusion_type",
     "type": "STRING",
-    "mode": "NULLABLE"
+    "mode": "REQUIRED"
   },
   {
     "name": "customer_id",
     "type": "STRING",
-    "mode": "NULLABLE"
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "exclusion_resource_name",
+    "type": "STRING",
+    "mode": "REQUIRED"
   },
   {
     "name": "datetime_updated",
     "type": "TIMESTAMP",
-    "mode": "NULLABLE"
+    "mode": "REQUIRED"
   }
 ]

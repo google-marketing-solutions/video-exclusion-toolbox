@@ -19,7 +19,7 @@ import logging
 import math
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any
 
 from google.cloud import bigquery
 from googleapiclient import discovery
@@ -58,7 +58,7 @@ BQ_SOURCE_TABLE_NAME = 'GoogleAdsReportChannel'
 BQ_TARGET_TABLE_NAME = 'YouTubeChannel'
 
 
-def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
+def main(event: dict[str, Any], context: dict[str, Any]) -> None:
   """The entry point: extract the data from the payload and starts the job.
 
   The pub/sub message must match the message_schema object above.
@@ -179,8 +179,8 @@ def _get_channel_details(channel_ids: set[str]) -> pd.DataFrame:
 
 
 def split_list_to_chunks(
-    lst: List[Any], max_size_of_chunk: int
-) -> List[np.ndarray]:
+    lst: list[Any], max_size_of_chunk: int
+) -> list[np.ndarray]:
   """Splits the list into X chunks with the maximum size as specified.
 
   Args:
@@ -199,8 +199,8 @@ def split_list_to_chunks(
 
 
 def process_youtube_response(
-    response: Dict[str, Any], channel_ids: List[str]
-) -> List[List[Any]]:
+    response: dict[str, Any], channel_ids: list[str]
+) -> list[list[Any]]:
   """Processes the YouTube response to extract the required information.
 
   Args:

@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any
 
 from google.cloud import bigquery
 from googleapiclient import discovery
@@ -58,7 +58,7 @@ BQ_SOURCE_TABLE_NAME = 'GoogleAdsReportVideo'
 BQ_TARGET_TABLE_NAME = 'YouTubeVideo'
 
 
-def main(event: Dict[str, Any], context: Dict[str, Any]) -> None:
+def main(event: dict[str, Any], context: dict[str, Any]) -> None:
   """The entry point: extract the data from the payload and starts the job.
 
   The pub/sub message must match the message_schema object above.
@@ -121,7 +121,7 @@ def run(date_partition: str) -> None:
 
 
 def _get_youtube_videos_dataframe(
-    video_ids: List[str],
+    video_ids: list[str],
 ) -> None:
   """Pulls information on each of the videos provided from the YouTube API.
 
@@ -187,8 +187,8 @@ def _get_youtube_videos_dataframe(
 
 
 def _split_list_to_chunks(
-    data: List[Any], max_size_of_chunk: int
-) -> List[np.ndarray]:
+    data: list[Any], max_size_of_chunk: int
+) -> list[np.ndarray]:
   """Splits the list into X chunks with the maximum size as specified.
 
   Args:
@@ -207,8 +207,8 @@ def _split_list_to_chunks(
 
 
 def _process_youtube_videos_response(
-    response: Dict[str, Any], video_ids: List[str]
-) -> List[List[Any]]:
+    response: dict[str, Any], video_ids: list[str]
+) -> list[list[Any]]:
   """Processes the YouTube response to extract the required information.
 
   Args:
