@@ -1,4 +1,4 @@
-"""Pytest configuration for the google-ads-accounts-dispatcher module."""
+"""Pytest configuration for the gads_account_dispatcher module."""
 
 import os
 import sys
@@ -35,7 +35,7 @@ def pytest_configure(config):
   del config  # Unused
   print(
       '[conftest.py:pytest_configure] Setting environment variables for'
-      ' google-ads-accounts-dispatcher test session.'
+      ' gads_account_dispatcher test session.'
   )
   for key in _env_vars_to_manage:
     _original_env_vars[key] = os.environ.get(key)
