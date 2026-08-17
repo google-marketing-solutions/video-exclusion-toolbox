@@ -1,0 +1,2 @@
+# Shared Google Ads API Client Library
+google-ads==31.3.0

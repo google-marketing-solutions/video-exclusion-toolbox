@@ -18,8 +18,6 @@ import logging
 import os
 import sys
 
-from google.cloud import logging as cloud_logging
-
 
 def get_service_logger(
     service_name_env: str = 'K_SERVICE',
@@ -27,6 +25,10 @@ def get_service_logger(
     log_level: int = logging.INFO,
 ) -> logging.Logger:
   """Initializes and returns a logger configured for Cloud Run or local testing.
+
+  As a side effect, this function suppresses noisy default logging from
+  third-party client libraries by setting the log level of 'google_genai',
+  'httpx', and 'google.ads.googleads.client' to WARNING.
 
   Args:
       service_name_env: Environment variable name storing the service name.
@@ -42,6 +44,8 @@ def get_service_logger(
   if os.getenv('IS_LOCAL_TEST', 'False') == 'True':
     logging.basicConfig(level=log_level, stream=sys.stdout)
   else:
+    from google.cloud import logging as cloud_logging  # pylint: disable=g-import-not-at-top
+
     logging_client = cloud_logging.Client()
     logging_client.setup_logging(log_level=log_level)
 

@@ -23,6 +23,12 @@ variable "region" {
   default     = "europe-west2"
 }
 
+variable "google_ads_client_version" {
+  type        = string
+  description = "The version of the Google Ads client library to use."
+  default     = "v25"
+}
+
 variable "oauth_refresh_token" {
   type        = string
   description = "The OAuth refresh token"

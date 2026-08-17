@@ -118,5 +118,29 @@
     "type": "FLOAT64",
     "mode": "NULLABLE",
     "description": "Percentage of impressions where the viewer watched 100% of your video."
+  },
+  {
+    "name": "campaign_id",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The Google Ads Campaign ID"
+  },
+  {
+    "name": "campaign_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The Google Ads Campaign Name"
+  },
+  {
+    "name": "ad_group_id",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The Google Ads Ad Group ID"
+  },
+  {
+    "name": "ad_group_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The Google Ads Ad Group Name"
   }
 ]

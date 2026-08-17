@@ -16,8 +16,8 @@
 resource "google_bigquery_table" "google_ads_report_video" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  table_id            = "GoogleAdsReportVideo"
-  deletion_protection = false
+  table_id            = "google_ads_report_video"
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/google_ads_report_video.json")
   time_partitioning {
@@ -26,11 +26,28 @@ resource "google_bigquery_table" "google_ads_report_video" {
   }
 }
 
+resource "google_bigquery_table" "google_ads_report_video_legacy_alias" {
+  project             = "${var.project_id}"
+  table_id            = "GoogleAdsReportVideo"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.google_ads_report_video
+  ]
+  view {
+    query          = <<-EOT
+      SELECT * FROM `${var.project_id}.${var.bq_dataset}.google_ads_report_video`
+    EOT
+    use_legacy_sql = false
+  }
+}
+
 resource "google_bigquery_table" "google_ads_report_channel" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "GoogleAdsReportChannel"
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/google_ads_report_channel.json")
   time_partitioning {
@@ -43,7 +60,7 @@ resource "google_bigquery_table" "google_ads_exclusions" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "GoogleAdsExclusions"
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/google_ads_exclusions.json")
 }
@@ -52,7 +69,7 @@ resource "google_bigquery_table" "youtube_channel" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeChannel"
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_channel.json")
 }
@@ -61,7 +78,7 @@ resource "google_bigquery_table" "youtube_video" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeVideo"
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_video.json")
 }
@@ -79,7 +96,7 @@ resource "google_bigquery_table" "youtube_thumbnail_cropouts" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeThumbnailCropouts"
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_thumbnail_cropout.json")
 }
@@ -90,7 +107,7 @@ resource "google_bigquery_table" "videos_with_matched_keywords" {
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "VideosWithMatchedKeywords"
   description         = "This table is populated by the 'identify_videos_with_kewords' stored procedure."
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/videos_with_matched_keywords.json")
 }
@@ -101,7 +118,7 @@ resource "google_bigquery_table" "channels_with_matched_keywords" {
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "ChannelsWithMatchedKeywords"
   description         = "This table is populated by the 'identify_channels_with_kewords' stored procedure."
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/channels_with_matched_keywords.json")
 }
@@ -110,7 +127,7 @@ resource "google_bigquery_table" "youtube_thumbnail_age_evaluation" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "youtube_thumbnail_age_evaluation"
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_thumbnail_age_evaluation.json")
 }
@@ -119,7 +136,7 @@ resource "google_bigquery_table" "youtube_thumbnail_age_evaluation" {
 resource "google_bigquery_table" "youtube_category_lookup" {
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   project             = "${var.project_id}"
-  deletion_protection = false
+  deletion_protection = true
   depends_on = [
     resource.google_bigquery_dataset.video_exclusion_toolbox,
     resource.google_storage_bucket_object.categories_lookup
@@ -138,7 +155,7 @@ resource "google_bigquery_table" "exclusion_keywords" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "ExclusionKeywords"
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   external_data_configuration {
     autodetect    = false
@@ -282,22 +299,54 @@ resource "google_bigquery_table" "google_ads_report_video_aggregated" {
   ]
   view {
     query          = <<-EOT
+      WITH latest_adgroup_placements AS (
+        SELECT
+          customer_id,
+          campaign_id,
+          ad_group_id,
+          video_id,
+          youtube_video_name,
+          youtube_video_url,
+          youtube_channel_url,
+          impressions,
+          cost_micros,
+          conversions,
+          video_views,
+          clicks,
+          datetime_updated
+        FROM `${var.project_id}.${var.bq_dataset}.google_ads_report_video`
+        QUALIFY ROW_NUMBER() OVER (
+          PARTITION BY customer_id, COALESCE(CAST(campaign_id AS STRING), ''), COALESCE(CAST(ad_group_id AS STRING), ''), video_id 
+          ORDER BY datetime_updated DESC
+        ) = 1
+      ),
+      first_seen_timeline AS (
+        SELECT
+          customer_id,
+          video_id,
+          MIN(datetime_updated) AS first_seen,
+          MAX(datetime_updated) AS last_seen
+        FROM `${var.project_id}.${var.bq_dataset}.google_ads_report_video`
+        GROUP BY 1, 2
+      )
       SELECT
-        customer_id,
-        video_id,
-        youtube_video_name,
-        youtube_video_url,
-        youtube_channel_url,
-        sum(impressions) impressions,
-        sum(cost_micros) cost_micros,
-        sum(conversions) conversions,
-        sum(video_views) video_views,
-        sum(clicks) clicks,
-        sum(all_conversions_from_interactions_rate) all_conversions_from_interactions_rate,
-        MIN(datetime_updated) first_seen,
-        MAX(datetime_updated) last_seen
-      FROM `${var.project_id}.${var.bq_dataset}.GoogleAdsReportVideo`
-      group by 1,2,3,4,5
+        l.customer_id,
+        l.video_id,
+        ANY_VALUE(l.youtube_video_name) AS youtube_video_name,
+        ANY_VALUE(l.youtube_video_url) AS youtube_video_url,
+        ANY_VALUE(l.youtube_channel_url) AS youtube_channel_url,
+        SUM(l.impressions) AS impressions,
+        SUM(l.cost_micros) AS cost_micros,
+        SUM(l.conversions) AS conversions,
+        SUM(l.video_views) AS video_views,
+        SUM(l.clicks) AS clicks,
+        COALESCE(SAFE_DIVIDE(SUM(l.conversions), SUM(l.clicks)), 0.0) AS all_conversions_from_interactions_rate,
+        t.first_seen,
+        t.last_seen
+      FROM latest_adgroup_placements l
+      JOIN first_seen_timeline t
+        ON l.customer_id = t.customer_id AND l.video_id = t.video_id
+      GROUP BY 1, 2, t.first_seen, t.last_seen
     EOT
     use_legacy_sql = false
   }

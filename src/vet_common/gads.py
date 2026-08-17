@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC.
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,3 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Shared Google Ads API helpers and version configuration."""
+
+import os
+
+DEFAULT_GOOGLE_ADS_API_VERSION = 'v25'
+
+
+def get_google_ads_client_version() -> str:
+  """Returns the configured or default Google Ads API version string."""
+  return os.environ.get(
+      'GOOGLE_ADS_CLIENT_VERSION', DEFAULT_GOOGLE_ADS_API_VERSION
+  )
