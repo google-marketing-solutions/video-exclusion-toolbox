@@ -24,6 +24,9 @@ def sanitize_gads_id(raw_id: Any) -> str:
       raw_id: The ID string or integer from a spreadsheet or API response.
 
   Returns:
-      A sanitized ID string without hyphens or leading/trailing whitespace.
+      A sanitized ID string without hyphens or leading/trailing whitespace,
+      or an empty string if the ID is empty or placeholder ('n/a', 'None').
   """
+  if not raw_id or str(raw_id).strip().lower() in ('none', 'n/a', 'na', 'null'):
+    return ''
   return str(raw_id).replace('-', '').strip()

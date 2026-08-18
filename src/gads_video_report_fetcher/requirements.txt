@@ -1,0 +1,21 @@
+# ==============================================================================
+# Service-Specific Dependencies (Add service-unique packages below)
+# ==============================================================================
+
+# ==============================================================================
+# Shared Dependencies (Inherited at build time via data.archive_file)
+# ==============================================================================
+# From src/google_ads_requirements.txt:
+# - google-ads
+#
+# From src/common_requirements.txt:
+# - functions-framework
+# - google-auth
+# - google-api-python-client
+# - google-cloud-logging
+# - google-cloud-pubsub
+# - google-cloud-bigquery
+# - pandas
+# - db-dtypes
+# - jsonschema
+

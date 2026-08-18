@@ -50,6 +50,63 @@ resource "google_cloudfunctions2_function" "gads_account_dispatcher" {
   ]
 }
 
+resource "google_cloudfunctions2_function" "gads_video_report_fetcher" {
+  location    = var.region
+  name        = "vet-gads-video-report-fetcher"
+  description = "Move the video placement report from Google Ads to BigQuery."
+
+  service_config {
+    max_instance_count               = 10
+    min_instance_count               = 0
+    available_memory                 = "1Gi"
+    timeout_seconds                  = 540
+    available_cpu                    = "1"
+    max_instance_request_concurrency = 1
+    environment_variables = {
+      GOOGLE_CLOUD_PROJECT                = var.project_id
+      GOOGLE_ADS_CLIENT_VERSION           = var.google_ads_client_version
+      GOOGLE_ADS_LOGIN_CUSTOMER_ID        = var.google_ads_login_customer_id
+      GOOGLE_ADS_USE_PROTO_PLUS           = "false"
+      VID_EXCL_BIGQUERY_DATASET           = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+      VID_EXCL_YOUTUBE_VIDEO_PUBSUB_TOPIC = google_pubsub_topic.youtube_video.name
+    }
+    secret_environment_variables {
+      key        = "GOOGLE_ADS_DEVELOPER_TOKEN"
+      project_id = var.project_id
+      secret     = google_secret_manager_secret.developer_token.secret_id
+      version    = "latest"
+    }
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    service_account_email          = google_service_account.video_exclusion_toolbox.email
+    all_traffic_on_latest_revision = true
+  }
+
+  build_config {
+    runtime     = "python314"
+    entry_point = "main"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.source_archive.name
+        object = google_storage_bucket_object.gads_video_report_fetcher.name
+      }
+    }
+  }
+
+  event_trigger {
+    trigger_region        = var.region
+    event_type            = "google.cloud.pubsub.topic.v1.messagePublished"
+    pubsub_topic          = google_pubsub_topic.gads_account.id
+    retry_policy          = "RETRY_POLICY_RETRY"
+    service_account_email = google_service_account.video_exclusion_toolbox.email
+  }
+
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.gads_video_report_fetcher,
+    resource.google_secret_manager_secret_version.developer_token
+  ]
+}
+
 resource "google_cloudfunctions2_function" "google_ads_exclusions_fetcher" {
   location    = var.region
   name        = "vet-google-ads-exclusions-fetcher"

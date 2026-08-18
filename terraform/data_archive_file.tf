@@ -39,6 +39,22 @@ data "archive_file" "gads_account_dispatcher" {
     content  = file("../src/vet_common/ids.py")
     filename = "vet_common/ids.py"
   }
+  source {
+    content  = file("../src/vet_common/events.py")
+    filename = "vet_common/events.py"
+  }
+  source {
+    content  = file("../src/vet_common/dates.py")
+    filename = "vet_common/dates.py"
+  }
+  source {
+    content  = file("../src/vet_common/bq.py")
+    filename = "vet_common/bq.py"
+  }
+  source {
+    content  = file("../src/vet_common/gads.py")
+    filename = "vet_common/gads.py"
+  }
   depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_exclusions_fetcher" {
@@ -60,11 +76,50 @@ data "archive_file" "google_ads_excluder" {
   source_dir  = "../src/google_ads_excluder/"
   depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
-data "archive_file" "google_ads_report_video" {
+data "archive_file" "gads_video_report_fetcher" {
   type        = "zip"
-  output_path = ".temp/google_ads_report_video.zip"
-  source_dir  = "../src/google_ads_report_video/"
-  depends_on  = [resource.google_project_iam_member.storage_object_admin]
+  output_path = ".temp/gads_video_report_fetcher.zip"
+  source {
+    content  = file("../src/gads_video_report_fetcher/main.py")
+    filename = "main.py"
+  }
+  source {
+    content  = "${file("../src/common_requirements.txt")}\n${file("../src/google_ads_requirements.txt")}\n${file("../src/gads_video_report_fetcher/requirements.txt")}"
+    filename = "requirements.txt"
+  }
+  source {
+    content  = file("../src/vet_common/__init__.py")
+    filename = "vet_common/__init__.py"
+  }
+  source {
+    content  = file("../src/vet_common/logging.py")
+    filename = "vet_common/logging.py"
+  }
+  source {
+    content  = file("../src/vet_common/pubsub.py")
+    filename = "vet_common/pubsub.py"
+  }
+  source {
+    content  = file("../src/vet_common/ids.py")
+    filename = "vet_common/ids.py"
+  }
+  source {
+    content  = file("../src/vet_common/events.py")
+    filename = "vet_common/events.py"
+  }
+  source {
+    content  = file("../src/vet_common/dates.py")
+    filename = "vet_common/dates.py"
+  }
+  source {
+    content  = file("../src/vet_common/bq.py")
+    filename = "vet_common/bq.py"
+  }
+  source {
+    content  = file("../src/vet_common/gads.py")
+    filename = "vet_common/gads.py"
+  }
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "google_ads_report_channel" {
   type        = "zip"

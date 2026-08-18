@@ -40,12 +40,12 @@ resource "google_storage_bucket_object" "google_ads_excluder" {
     resource.google_storage_bucket.source_archive
   ]
 }
-resource "google_storage_bucket_object" "google_ads_report_video" {
-  name   = "google_ads_report_video${data.archive_file.google_ads_report_video.output_md5}.zip"
+resource "google_storage_bucket_object" "gads_video_report_fetcher" {
+  name   = "gads_video_report_fetcher_${data.archive_file.gads_video_report_fetcher.output_md5}.zip"
   bucket = google_storage_bucket.source_archive.name
-  source = data.archive_file.google_ads_report_video.output_path
+  source = data.archive_file.gads_video_report_fetcher.output_path
   depends_on = [
-    data.archive_file.google_ads_report_video,
+    data.archive_file.gads_video_report_fetcher,
     resource.google_storage_bucket.source_archive
   ]
 }
