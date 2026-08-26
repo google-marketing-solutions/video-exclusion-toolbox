@@ -14,9 +14,13 @@
 
 """Standardized Cloud Logging bootstrap for Video Exclusion Toolbox services."""
 
+import json
 import logging
 import os
 import sys
+import time
+from typing import Any, Optional
+import uuid
 
 
 def get_service_logger(
@@ -24,11 +28,10 @@ def get_service_logger(
     default_name: str = 'failed_to_get_cloud_function_name',
     log_level: int = logging.INFO,
 ) -> logging.Logger:
-  """Initializes and returns a logger configured for Cloud Run or local testing.
+  """Initializes and returns a clean, non-duplicating service logger for Cloud Run or local testing.
 
-  As a side effect, this function suppresses noisy default logging from
-  third-party client libraries by setting the log level of 'google_genai',
-  'httpx', and 'google.ads.googleads.client' to WARNING.
+  Uses standard stdout streaming which is natively captured by Cloud Run without
+  introducing duplicate handlers or network latency.
 
   Args:
       service_name_env: Environment variable name storing the service name.
@@ -41,18 +44,81 @@ def get_service_logger(
   service_name = os.environ.get(service_name_env, default_name)
   logger = logging.getLogger(service_name)
 
-  if os.getenv('IS_LOCAL_TEST', 'False') == 'True':
-    logging.basicConfig(level=log_level, stream=sys.stdout)
-  else:
-    from google.cloud import logging as cloud_logging  # pylint: disable=g-import-not-at-top
+  # Prevent multiple handlers and duplicate propagation on repeated calls/imports
+  if not logger.handlers:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(log_level)
+    logger.addHandler(handler)
+    logger.propagate = False
 
-    logging_client = cloud_logging.Client()
-    logging_client.setup_logging(log_level=log_level)
+  logger.setLevel(log_level)
 
   # Suppress noisy default logging from third-party client libraries.
   logging.getLogger('google_genai').setLevel(logging.WARNING)
   logging.getLogger('httpx').setLevel(logging.WARNING)
   logging.getLogger('google.ads.googleads.client').setLevel(logging.WARNING)
 
-  logger.setLevel(log_level)
   return logger
+
+
+class PipelineTelemetryContext:
+  """Manages structured step-by-step execution telemetry for VET services."""
+
+  def __init__(
+      self,
+      logger: logging.Logger,
+      service_name: Optional[str] = None,
+      customer_id: Optional[str] = None,
+      run_id: Optional[str] = None,
+  ):
+    self.logger = logger
+    self.service = service_name or os.environ.get(
+        'K_SERVICE', 'unknown_service'
+    )
+    self.customer_id = customer_id
+    self.run_id = run_id or str(uuid.uuid4())
+    self.start_time = time.perf_counter()
+    self._last_step_time = self.start_time
+
+  def set_customer_id(self, customer_id: Optional[str]) -> None:
+    """Updates the active customer_id context for subsequent steps."""
+    self.customer_id = customer_id
+
+  def log_step(
+      self,
+      step: str,
+      status: str = 'SUCCESS',
+      records_in: int = 0,
+      records_out: int = 0,
+      error: Optional[Exception] = None,
+      metadata: Optional[dict[str, Any]] = None,
+  ) -> dict[str, Any]:
+    """Logs a structured JSON telemetry step to stdout for BigQuery ingestion."""
+    now = time.perf_counter()
+    step_duration_ms = int((now - self._last_step_time) * 1000)
+    elapsed_ms = int((now - self.start_time) * 1000)
+    self._last_step_time = now
+
+    payload = {
+        'event_type': 'pipeline_step',
+        'run_id': self.run_id,
+        'service': self.service,
+        'customer_id': self.customer_id,
+        'step': step,
+        'status': status,
+        'step_duration_ms': step_duration_ms,
+        'elapsed_ms': elapsed_ms,
+        'records_in': records_in,
+        'records_out': records_out,
+        'error_type': type(error).__name__ if error else None,
+        'error_message': str(error) if error else None,
+        'metadata': metadata or {},
+    }
+
+    serialized = json.dumps(payload)
+    if status == 'FAILED':
+      self.logger.error(serialized)
+    else:
+      self.logger.info(serialized)
+
+    return payload

@@ -12,8 +12,19 @@ from gads_video_report_fetcher import main
 class MockCloudEvent:
   """Mock CloudEvent object conforming to functions_framework CloudEvent protocol."""
 
-  def __init__(self, data: dict[str, Any]):
+  def __init__(
+      self,
+      data: dict[str, Any],
+      attributes: dict[str, Any] | None = None,
+  ):
     self.data = data
+    self._attributes = attributes or {}
+
+  def get(self, key: str, default: Any = None) -> Any:
+    return self._attributes.get(key, default)
+
+  def __getitem__(self, key: str) -> Any:
+    return self._attributes[key]
 
 
 def test_get_report_query_single_day_without_filters():
@@ -253,10 +264,17 @@ def test_run_new_records_persists_to_bq_and_publishes_event(
   mock_fetch_records.return_value = (fake_buffer, {'v1', 'v2'}, 2)
   mock_get_existing_ids.return_value = {'v1'}
 
-  main.run(customer_id='1234567890', lookback_days=1, gads_filters='')
+  mock_telemetry = mock.Mock()
+  main.run(
+      customer_id='1234567890',
+      lookback_days=1,
+      gads_filters='',
+      telemetry=mock_telemetry,
+  )
 
   mock_upsert_bq.assert_called_once()
   mock_publish_batch.assert_called_once()
+  assert mock_telemetry.log_step.call_count == 5
 
 
 @mock.patch.object(main, 'publish_batch')
@@ -268,10 +286,23 @@ def test_run_empty_report_exits_early_without_bq_or_pubsub(
   """Tests that an empty report stream exits cleanly without writing or publishing."""
   mock_fetch_records.return_value = (io.BytesIO(), set(), 0)
 
-  main.run(customer_id='1234567890', lookback_days=1, gads_filters='')
+  mock_telemetry = mock.Mock()
+  main.run(
+      customer_id='1234567890',
+      lookback_days=1,
+      gads_filters='',
+      telemetry=mock_telemetry,
+  )
 
   mock_upsert_bq.assert_not_called()
   mock_publish_batch.assert_not_called()
+  mock_telemetry.log_step.assert_called_with(
+      step='SKIPPED',
+      records_out=0,
+      metadata={
+          'reason': 'No placements returned from Google Ads or account disabled'
+      },
+  )
 
 
 @mock.patch.object(main, 'run')
@@ -293,6 +324,7 @@ def test_main_cloudevent_valid_payload_executes_run(mock_run):
       customer_id='1234567890',
       lookback_days=7,
       gads_filters='metrics.impressions > 50',
+      telemetry=mock.ANY,
   )
 
 
@@ -330,3 +362,26 @@ def test_main_cloudevent_runtime_exception_handled_gracefully(mock_run):
   # Should catch and log error, avoiding uncaught crash
   main.main(event)
   mock_run.assert_called_once()
+
+
+@mock.patch.object(main, 'run')
+def test_main_cloudevent_extracts_event_id_for_telemetry(mock_run):
+  """Tests that CloudEvent id is extracted via dictionary interface and assigned to telemetry."""
+  payload = {
+      'customer_id': '123-456-7890',
+      'lookback_days': 1,
+      'gads_filters': '',
+  }
+  encoded_data = base64.b64encode(json.dumps(payload).encode('utf-8')).decode(
+      'utf-8'
+  )
+  event = MockCloudEvent(
+      data={'message': {'data': encoded_data}},
+      attributes={'id': 'cloudevent-test-id-12345'},
+  )
+
+  main.main(event)
+
+  mock_run.assert_called_once()
+  telemetry_arg = mock_run.call_args[1]['telemetry']
+  assert telemetry_arg.run_id == 'cloudevent-test-id-12345'

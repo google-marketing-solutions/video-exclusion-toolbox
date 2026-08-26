@@ -64,28 +64,6 @@ def write_ndjson_to_bq(
   return output_rows
 
 
-def write_df_to_bq(
-    client: bigquery.Client,
-    df: Any,
-    destination: str,
-    write_disposition: str = 'WRITE_APPEND',
-    schema: Optional[list[bigquery.SchemaField]] = None,
-    logger: Optional[logging.Logger] = None,
-) -> None:
-  """Writes a Pandas DataFrame to BigQuery using a LoadJob (legacy helper)."""
-  log = logger or logging.getLogger(__name__)
-
-  job_config = bigquery.LoadJobConfig(
-      write_disposition=write_disposition,
-  )
-  if schema:
-    job_config.schema = schema
-
-  job = client.load_table_from_dataframe(
-      dataframe=df, destination=destination, job_config=job_config
-  )
-  job.result()
-  log.info('Successfully wrote %d records to %s.', len(df.index), destination)
 
 
 def upsert_ndjson_to_bq(

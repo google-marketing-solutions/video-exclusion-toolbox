@@ -15,7 +15,6 @@
 # - google-cloud-logging
 # - google-cloud-pubsub
 # - google-cloud-bigquery
-# - pandas
-# - db-dtypes
 # - jsonschema
+
 

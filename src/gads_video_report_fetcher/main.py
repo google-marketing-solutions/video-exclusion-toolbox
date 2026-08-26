@@ -33,6 +33,7 @@ from vet_common.events import parse_pubsub_cloudevent
 from vet_common.gads import get_google_ads_client_version
 from vet_common.ids import sanitize_gads_id
 from vet_common.logging import get_service_logger
+from vet_common.logging import PipelineTelemetryContext
 from vet_common.pubsub import publish_batch
 
 logger = get_service_logger()
@@ -385,8 +386,14 @@ def run(
     customer_id: str,
     lookback_days: int,
     gads_filters: str,
+    telemetry: Optional[PipelineTelemetryContext] = None,
 ) -> None:
   """Fetches video placements, upserts today's partition via MERGE, and notifies downstream."""
+  telemetry = telemetry or PipelineTelemetryContext(
+      logger=logger,
+      service_name=os.environ.get('K_SERVICE', 'vet-gads-video-report-fetcher'),
+      customer_id=customer_id,
+  )
   logger.info(
       '[%s] Starting video placement report pipeline (lookback: %d days).',
       customer_id,
@@ -398,9 +405,27 @@ def run(
       gads_filters=gads_filters,
   )
 
+  telemetry.log_step(
+      step='FETCH_GADS_STREAM',
+      records_out=row_count,
+      metadata={
+          'unique_video_ids_count': len(retrieved_video_ids),
+          'lookback_days': lookback_days,
+      },
+  )
+
   if row_count == 0:
     logger.info(
         '[%s] No video placements returned from Google Ads.', customer_id
+    )
+    telemetry.log_step(
+        step='SKIPPED',
+        records_out=0,
+        metadata={
+            'reason': (
+                'No placements returned from Google Ads or account disabled'
+            )
+        },
     )
     return
 
@@ -432,6 +457,17 @@ def run(
       today_date,
   )
 
+  telemetry.log_step(
+      step='CHECK_EXISTING_PARTITION',
+      records_in=len(retrieved_video_ids),
+      records_out=len(new_video_ids),
+      metadata={
+          'partition_date': str(today_date),
+          'existing_ids_count': len(existing_ids),
+          'net_new_ids_count': len(new_video_ids),
+      },
+  )
+
   upsert_ndjson_to_bq(
       client=bq_client,
       ndjson_buffer=buffer,
@@ -442,6 +478,16 @@ def run(
       partition_date=today_date,
       log_prefix=f'[{customer_id}] ',
       logger=logger,
+  )
+
+  telemetry.log_step(
+      step='UPSERT_BIGQUERY',
+      records_in=row_count,
+      records_out=row_count,
+      metadata={
+          'target_table': BIGQUERY_TABLE_NAME,
+          'partition_date': str(today_date),
+      },
   )
 
   if new_video_ids:
@@ -459,6 +505,15 @@ def run(
         YOUTUBE_VIDEO_PUBSUB_TOPIC,
         len(new_video_ids),
     )
+    telemetry.log_step(
+        step='PUBLISH_DOWNSTREAM',
+        records_in=len(new_video_ids),
+        records_out=1,
+        metadata={
+            'topic': YOUTUBE_VIDEO_PUBSUB_TOPIC,
+            'notified': True,
+        },
+    )
   else:
     logger.info(
         '[%s] All %d placements updated in BigQuery via MERGE; no new videos'
@@ -466,6 +521,21 @@ def run(
         customer_id,
         row_count,
     )
+    telemetry.log_step(
+        step='PUBLISH_DOWNSTREAM',
+        records_in=0,
+        records_out=0,
+        metadata={
+            'topic': YOUTUBE_VIDEO_PUBSUB_TOPIC,
+            'notified': False,
+        },
+    )
+
+  telemetry.log_step(
+      step='COMPLETE',
+      records_out=row_count,
+      metadata={'status': 'Success'},
+  )
 
   logger.info('[%s] Completed video placement report pipeline.', customer_id)
 
@@ -485,11 +555,29 @@ def main(cloud_event: functions_framework.cloud_event) -> None:
   lookback_days = int(payload['lookback_days'])
   gads_filters = payload.get('gads_filters', '')
 
+  event_id = (
+      cloud_event.get('id')
+      if hasattr(cloud_event, 'get')
+      else getattr(cloud_event, 'id', None)
+  )
+  telemetry = PipelineTelemetryContext(
+      logger=logger,
+      service_name=os.environ.get('K_SERVICE', 'vet-gads-video-report-fetcher'),
+      customer_id=customer_id,
+      run_id=event_id,
+  )
+  telemetry.log_step(
+      step='INITIALIZE',
+      status='SUCCESS',
+      metadata={'lookback_days': lookback_days, 'gads_filters': gads_filters},
+  )
+
   try:
     run(
         customer_id=customer_id,
         lookback_days=lookback_days,
         gads_filters=gads_filters,
+        telemetry=telemetry,
     )
   except Exception as e:  # pylint: disable=broad-except
     logger.error(
@@ -497,4 +585,10 @@ def main(cloud_event: functions_framework.cloud_event) -> None:
         customer_id,
         e,
         exc_info=True,
+    )
+    telemetry.log_step(
+        step='ERROR',
+        status='FAILED',
+        error=e,
+        metadata={'lookback_days': lookback_days},
     )
