@@ -15,7 +15,7 @@
 """Fetch the Google Ads configs and push them to pub/sub."""
 
 import os
-from typing import Any
+from typing import Any, Optional
 
 import flask
 import functions_framework
@@ -24,6 +24,7 @@ from googleapiclient import discovery
 import jsonschema
 from vet_common.ids import sanitize_gads_id
 from vet_common.logging import get_service_logger
+from vet_common.logging import PipelineTelemetryContext
 from vet_common.pubsub import publish_batch
 
 logger = get_service_logger()
@@ -47,11 +48,15 @@ REQUEST_SCHEMA = {
 }
 
 
-def _get_config_from_sheet(sheet_id: str) -> list[dict[str, Any]]:
+def _get_config_from_sheet(
+    sheet_id: str,
+    telemetry: Optional[PipelineTelemetryContext] = None,
+) -> list[dict[str, Any]]:
   """Gets the Ads account config from the Google Sheet, and return the results.
 
   Args:
       sheet_id: The ID of the Google Sheet containing the config.
+      telemetry: Optional telemetry context for tracking step metrics.
 
   Returns:
       A row for each account a report needs to be run for.
@@ -71,6 +76,10 @@ def _get_config_from_sheet(sheet_id: str) -> list[dict[str, Any]]:
           ...
       ]
   """
+  telemetry = telemetry or PipelineTelemetryContext(
+      logger=logger,
+      service_name=os.environ.get('K_SERVICE', 'vet-gads-account-dispatcher'),
+  )
   logger.info('Getting config from sheet: %s', sheet_id)
   credentials, _ = google.auth.default(scopes=SCOPES)
   sheets_service = discovery.build(
@@ -135,6 +144,18 @@ def _get_config_from_sheet(sheet_id: str) -> list[dict[str, Any]]:
 
   logger.info('Account configs:')
   logger.info(account_configs)
+
+  telemetry.log_step(
+      step='FETCH_CONFIG_SHEET',
+      records_in=len(customer_ids),
+      records_out=len(account_configs),
+      metadata={
+          'sheet_id': sheet_id,
+          'enabled_count': len(account_configs),
+          'disabled_count': len(customer_ids) - len(account_configs),
+      },
+  )
+
   return account_configs
 
 
@@ -162,19 +183,44 @@ def _gads_filters_to_gaql_string(config_filters: list[list[str]]) -> str:
   return ' AND '.join(conditions)
 
 
-def run(sheet_id: str) -> None:
+def run(
+    sheet_id: str,
+    telemetry: Optional[PipelineTelemetryContext] = None,
+) -> None:
   """Orchestration for the function.
 
   Args:
       sheet_id: the ID of the Google Sheet containing the config.
+      telemetry: Optional telemetry context for tracking step metrics.
   """
+  telemetry = telemetry or PipelineTelemetryContext(
+      logger=logger,
+      service_name=os.environ.get('K_SERVICE', 'vet-gads-account-dispatcher'),
+  )
   logger.info('Running Google Ads account script')
+  configs = _get_config_from_sheet(sheet_id=sheet_id, telemetry=telemetry)
   publish_batch(
       project_id=GOOGLE_CLOUD_PROJECT,
       topic_id=ACCOUNT_PUBSUB_TOPIC,
-      messages=_get_config_from_sheet(sheet_id),
+      messages=configs,
       logger=logger,
   )
+
+  telemetry.log_step(
+      step='DISPATCH_PUBSUB',
+      records_in=len(configs),
+      records_out=len(configs),
+      metadata={
+          'topic': ACCOUNT_PUBSUB_TOPIC,
+          'dispatched_count': len(configs),
+      },
+  )
+  telemetry.log_step(
+      step='COMPLETE',
+      records_out=len(configs),
+      metadata={'status': 'Success'},
+  )
+
   logger.info('Done.')
 
 
@@ -191,6 +237,10 @@ def main(request: flask.Request) -> flask.Response:
       The flask response.
   """
   logger.info('Google Ads Account dispatch triggered.')
+  telemetry = PipelineTelemetryContext(
+      logger=logger,
+      service_name=os.environ.get('K_SERVICE', 'vet-gads-account-dispatcher'),
+  )
 
   request_json = request.get_json(silent=True)
   logger.info('JSON payload: %s', request_json)
@@ -199,16 +249,34 @@ def main(request: flask.Request) -> flask.Response:
     jsonschema.validate(instance=request_json, schema=REQUEST_SCHEMA)
   except jsonschema.exceptions.ValidationError as err:
     logger.error('Invalid request payload: %s', err)
+    telemetry.log_step(
+        step='INITIALIZE',
+        status='FAILED',
+        error=err,
+    )
     response['status'] = 'Failed'
     response['message'] = err.message
     return flask.Response(
         flask.json.dumps(response), status=400, mimetype='application/json'
     )
 
+  sheet_id = request_json['sheet_id']
+  telemetry.log_step(
+      step='INITIALIZE',
+      status='SUCCESS',
+      metadata={'sheet_id': sheet_id},
+  )
+
   try:
-    run(request_json['sheet_id'])
+    run(sheet_id=sheet_id, telemetry=telemetry)
   except Exception as err:  # pylint: disable=broad-except
     logger.error('Failed to run Google Ads account script: %s', err)
+    telemetry.log_step(
+        step='ERROR',
+        status='FAILED',
+        error=err,
+        metadata={'sheet_id': sheet_id},
+    )
     response['status'] = 'Failed'
     response['message'] = str(err)
     return flask.Response(

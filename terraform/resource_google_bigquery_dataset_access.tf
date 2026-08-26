@@ -12,5 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Shared utilities and common infrastructure for Video Exclusion Toolbox (VET) services."""
-
+resource "google_bigquery_dataset_access" "pipeline_stats_sink_bq_writer" {
+  project       = var.project_id
+  dataset_id    = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  role          = "roles/bigquery.dataEditor"
+  user_by_email = replace(google_logging_project_sink.pipeline_stats.writer_identity, "serviceAccount:", "")
+  depends_on    = [google_logging_project_sink.pipeline_stats]
+}

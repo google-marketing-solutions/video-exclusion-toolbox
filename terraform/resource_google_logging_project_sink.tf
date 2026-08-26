@@ -1,9 +1,9 @@
 # Copyright 2026 Google LLC
-#
+# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+# 
 #     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
@@ -12,5 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Shared utilities and common infrastructure for Video Exclusion Toolbox (VET) services."""
+resource "google_logging_project_sink" "pipeline_stats" {
+  name        = "vet-pipeline-stats-sink"
+  description = "Routes structured VET pipeline execution telemetry to BigQuery"
+  project     = var.project_id
 
+  destination = "bigquery.googleapis.com/projects/${var.project_id}/datasets/${google_bigquery_dataset.video_exclusion_toolbox.dataset_id}"
+
+  filter = "jsonPayload.event_type=\"pipeline_step\""
+
+  unique_writer_identity = true
+
+  bigquery_options {
+    use_partitioned_tables = true
+  }
+}

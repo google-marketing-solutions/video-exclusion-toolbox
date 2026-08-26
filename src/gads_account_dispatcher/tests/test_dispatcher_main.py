@@ -91,7 +91,10 @@ def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
 
   mock_spreadsheets.values.return_value.get.side_effect = values_get_side_effect
 
-  result = main._get_config_from_sheet('test_sheet_123')
+  mock_telemetry = mock.Mock()
+  result = main._get_config_from_sheet(
+      'test_sheet_123', telemetry=mock_telemetry
+  )
 
   assert len(result) == 2
   assert result[0] == {
@@ -110,6 +113,16 @@ def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
       'gads_filters': expected_gads_filters,
       'settings': expected_settings,
   }
+  mock_telemetry.log_step.assert_called_once_with(
+      step='FETCH_CONFIG_SHEET',
+      records_in=4,
+      records_out=2,
+      metadata={
+          'sheet_id': 'test_sheet_123',
+          'enabled_count': 2,
+          'disabled_count': 2,
+      },
+  )
 
 
 @mock.patch.object(main.discovery, 'build')
@@ -159,9 +172,13 @@ def test_run_valid_sheet_fetches_config_and_publishes_batch(
     mock_get_config, mock_publish
 ):
   mock_get_config.return_value = [{'sheet_id': 's1'}]
-  main.run('test_sheet_123')
-  mock_get_config.assert_called_once_with('test_sheet_123')
+  mock_telemetry = mock.Mock()
+  main.run('test_sheet_123', telemetry=mock_telemetry)
+  mock_get_config.assert_called_once_with(
+      sheet_id='test_sheet_123', telemetry=mock_telemetry
+  )
   mock_publish.assert_called_once()
+  assert mock_telemetry.log_step.call_count == 2
 
 
 def test_main_http_valid_request_returns_200_success():
@@ -172,7 +189,9 @@ def test_main_http_valid_request_returns_200_success():
   ):
     with mock.patch.object(main, 'run') as mock_run:
       response = main.main(flask.request)
-      mock_run.assert_called_once_with('test_sheet_123')
+      mock_run.assert_called_once_with(
+          sheet_id='test_sheet_123', telemetry=mock.ANY
+      )
       assert response.status_code == 200
       data = json.loads(response.get_data(as_text=True))
       assert data['status'] == 'Success'

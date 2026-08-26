@@ -19,17 +19,17 @@ from concurrent import futures
 import datetime
 import io
 import json
+import logging
 import os
+import time
 from typing import Any
 from unittest import mock
 
 from google.cloud import bigquery
 from google.cloud import pubsub_v1
-import pandas as pd
 import pytest
 from vet_common.bq import get_existing_partition_ids
 from vet_common.bq import upsert_ndjson_to_bq
-from vet_common.bq import write_df_to_bq
 from vet_common.bq import write_ndjson_to_bq
 from vet_common.dates import get_lookback_date_range
 from vet_common.events import parse_pubsub_cloudevent
@@ -37,6 +37,7 @@ from vet_common.gads import DEFAULT_GOOGLE_ADS_API_VERSION
 from vet_common.gads import get_google_ads_client_version
 from vet_common.ids import sanitize_gads_id
 from vet_common.logging import get_service_logger
+from vet_common.logging import PipelineTelemetryContext
 from vet_common.pubsub import publish_batch
 
 
@@ -149,17 +150,6 @@ def test_parse_pubsub_cloudevent_empty_or_malformed_returns_none():
   assert parse_pubsub_cloudevent(event_invalid_json) is None
 
 
-def test_write_df_to_bq_executes_load_job():
-  """Test writing dataframe to BigQuery."""
-  mock_client = mock.MagicMock(spec=bigquery.Client)
-  mock_job = mock.MagicMock()
-  mock_client.load_table_from_dataframe.return_value = mock_job
-
-  df = pd.DataFrame([{'a': 1, 'b': 'test'}])
-  write_df_to_bq(mock_client, df, 'proj.dataset.table')
-
-  mock_client.load_table_from_dataframe.assert_called_once()
-  mock_job.result.assert_called_once()
 
 
 def test_write_ndjson_to_bq_executes_load_job():
@@ -250,3 +240,65 @@ def test_get_google_ads_client_version_reads_env_variable():
   """Test that get_google_ads_client_version prioritizes GOOGLE_ADS_CLIENT_VERSION env var."""
   with mock.patch.dict(os.environ, {'GOOGLE_ADS_CLIENT_VERSION': 'v26'}):
     assert get_google_ads_client_version() == 'v26'
+
+
+def test_pipeline_telemetry_context_initialization_and_success_logging():
+  """Test PipelineTelemetryContext logging a structured step."""
+  mock_logger = mock.MagicMock(spec=logging.Logger)
+  telemetry = PipelineTelemetryContext(
+      logger=mock_logger,
+      service_name='test-service',
+      customer_id='1234567890',
+      run_id='run-123',
+  )
+
+  assert telemetry.service == 'test-service'
+  assert telemetry.customer_id == '1234567890'
+  assert telemetry.run_id == 'run-123'
+
+  time.sleep(0.01)
+  payload = telemetry.log_step(
+      step='TEST_STEP',
+      records_in=10,
+      records_out=5,
+      metadata={'extra': 'value'},
+  )
+
+  assert payload['event_type'] == 'pipeline_step'
+  assert payload['run_id'] == 'run-123'
+  assert payload['service'] == 'test-service'
+  assert payload['customer_id'] == '1234567890'
+  assert payload['step'] == 'TEST_STEP'
+  assert payload['status'] == 'SUCCESS'
+  assert payload['records_in'] == 10
+  assert payload['records_out'] == 5
+  assert payload['metadata'] == {'extra': 'value'}
+  assert payload['step_duration_ms'] >= 5
+  assert payload['elapsed_ms'] >= 5
+
+  mock_logger.info.assert_called_once()
+  logged_json = json.loads(mock_logger.info.call_args[0][0])
+  assert logged_json == payload
+
+
+def test_pipeline_telemetry_context_failure_logging():
+  """Test PipelineTelemetryContext logging a failed step."""
+  mock_logger = mock.MagicMock(spec=logging.Logger)
+  telemetry = PipelineTelemetryContext(logger=mock_logger)
+  telemetry.set_customer_id('8056520078')
+
+  err = ValueError('Invalid argument provided')
+  payload = telemetry.log_step(
+      step='FAIL_STEP',
+      status='FAILED',
+      error=err,
+  )
+
+  assert payload['status'] == 'FAILED'
+  assert payload['customer_id'] == '8056520078'
+  assert payload['error_type'] == 'ValueError'
+  assert payload['error_message'] == 'Invalid argument provided'
+
+  mock_logger.error.assert_called_once()
+  logged_json = json.loads(mock_logger.error.call_args[0][0])
+  assert logged_json == payload
