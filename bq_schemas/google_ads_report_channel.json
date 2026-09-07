@@ -3,7 +3,7 @@
     "name": "datetime_updated",
     "type": "TIMESTAMP",
     "mode": "REQUIRED",
-    "description": "The datetime the data was pulled from YouTube"
+    "description": "The datetime the data was pulled from Google Ads"
   },
   {
     "name": "customer_id",
@@ -76,5 +76,41 @@
     "type": "FLOAT64",
     "mode": "NULLABLE",
     "description": "The conversion rate"
+  },
+  {
+    "name": "youtube_channel_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The placement display name in Google Ads"
+  },
+  {
+    "name": "placement_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The placement type"
+  },
+  {
+    "name": "campaign_id",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The Google Ads Campaign ID"
+  },
+  {
+    "name": "campaign_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The Google Ads Campaign Name"
+  },
+  {
+    "name": "ad_group_id",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "The Google Ads Ad Group ID"
+  },
+  {
+    "name": "ad_group_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The Google Ads Ad Group Name"
   }
 ]

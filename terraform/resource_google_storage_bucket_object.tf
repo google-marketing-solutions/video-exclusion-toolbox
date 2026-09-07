@@ -49,12 +49,12 @@ resource "google_storage_bucket_object" "gads_video_report_fetcher" {
     resource.google_storage_bucket.source_archive
   ]
 }
-resource "google_storage_bucket_object" "google_ads_report_channel" {
-  name   = "google_ads_report_channel${data.archive_file.google_ads_report_channel.output_md5}.zip"
+resource "google_storage_bucket_object" "gads_channel_report_fetcher" {
+  name   = "gads_channel_report_fetcher_${data.archive_file.gads_channel_report_fetcher.output_md5}.zip"
   bucket = google_storage_bucket.source_archive.name
-  source = data.archive_file.google_ads_report_channel.output_path
+  source = data.archive_file.gads_channel_report_fetcher.output_path
   depends_on = [
-    data.archive_file.google_ads_report_channel,
+    data.archive_file.gads_channel_report_fetcher,
     resource.google_storage_bucket.source_archive
   ]
 }
