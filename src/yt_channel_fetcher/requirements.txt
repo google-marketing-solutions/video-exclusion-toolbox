@@ -1,0 +1,1 @@
+# Requirements for yt_channel_fetcher (extends common_requirements.txt)

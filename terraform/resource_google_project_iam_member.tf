@@ -60,3 +60,9 @@ resource "google_project_iam_member" "cloudbuild_vertex_ai_user" {
   member     = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
   depends_on = [resource.google_service_account.video_exclusion_toolbox]
 }
+resource "google_project_iam_member" "cloudbuild_builder" {
+  project    = var.project_id
+  role       = "roles/cloudbuild.builds.builder"
+  member     = "serviceAccount:${google_service_account.video_exclusion_toolbox.email}"
+  depends_on = [resource.google_service_account.video_exclusion_toolbox]
+}

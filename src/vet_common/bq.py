@@ -64,8 +64,6 @@ def write_ndjson_to_bq(
   return output_rows
 
 
-
-
 def upsert_ndjson_to_bq(
     client: bigquery.Client,
     ndjson_buffer: io.BytesIO,
@@ -73,13 +71,13 @@ def upsert_ndjson_to_bq(
     dataset_id: str,
     table_name: str,
     key_columns: list[str],
-    partition_date: Union[datetime.date, str],
+    partition_date: Optional[Union[datetime.date, str]] = None,
     timestamp_column: str = 'datetime_updated',
     schema: Optional[list[bigquery.SchemaField]] = None,
     log_prefix: str = '',
     logger: Optional[logging.Logger] = None,
 ) -> int:
-  """Upserts an NDJSON buffer into a partitioned BigQuery table using a transient staging table and partition-scoped MERGE.
+  """Upserts an NDJSON buffer into a BigQuery table using a transient staging table and MERGE.
 
   Args:
       client: The BigQuery client.
@@ -89,8 +87,9 @@ def upsert_ndjson_to_bq(
       dataset_id: The BigQuery dataset ID.
       table_name: The target table name.
       key_columns: List of column names forming the unique composite key (e.g.
-        ['customer_id', 'video_id']).
-      partition_date: The date partition for scoping the MERGE statement.
+        ['customer_id', 'video_id'] or ['channel_id']).
+      partition_date: Optional date partition for scoping the MERGE statement.
+        If None, merges across the entire table.
       timestamp_column: The partition timestamp column name (defaults to
         'datetime_updated').
       schema: Optional explicit BigQuery schema field definitions. If None, it
@@ -144,18 +143,20 @@ def upsert_ndjson_to_bq(
       )
       return 0
 
-    date_str = (
-        partition_date.isoformat()
-        if hasattr(partition_date, 'isoformat')
-        else str(partition_date)
-    )
     match_predicates = ' AND '.join(
         [f'target.{col} = source.{col}' for col in key_columns]
     )
-    match_predicates += (
-        f' AND TIMESTAMP_TRUNC(target.{timestamp_column}, DAY) ='
-        f' TIMESTAMP("{date_str}")'
-    )
+    date_str = ''
+    if partition_date:
+      date_str = (
+          partition_date.isoformat()
+          if hasattr(partition_date, 'isoformat')
+          else str(partition_date)
+      )
+      match_predicates += (
+          f' AND TIMESTAMP_TRUNC(target.{timestamp_column}, DAY) ='
+          f' TIMESTAMP("{date_str}")'
+      )
 
     update_cols = [
         field.name for field in schema if field.name not in key_columns
@@ -195,12 +196,13 @@ def upsert_ndjson_to_bq(
         else ''
     )
 
+    partition_log_str = f' for partition {date_str}' if partition_date else ''
     log.info(
-        '%sSuccessfully merged %d staging records into %s for partition %s%s.',
+        '%sSuccessfully merged %d staging records into %s%s%s.',
         log_prefix,
         output_rows,
         target_table_id,
-        date_str,
+        partition_log_str,
         dml_stat_str,
     )
     return output_rows

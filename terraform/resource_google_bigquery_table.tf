@@ -46,13 +46,30 @@ resource "google_bigquery_table" "google_ads_report_video_legacy_alias" {
 resource "google_bigquery_table" "google_ads_report_channel" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  table_id            = "GoogleAdsReportChannel"
+  table_id            = "google_ads_report_channel"
   deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/google_ads_report_channel.json")
   time_partitioning {
     type  = "DAY"
     field = "datetime_updated"
+  }
+}
+
+resource "google_bigquery_table" "google_ads_report_channel_legacy_alias" {
+  project             = "${var.project_id}"
+  table_id            = "GoogleAdsReportChannel"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.google_ads_report_channel
+  ]
+  view {
+    query          = <<-EOT
+      SELECT * FROM `${var.project_id}.${var.bq_dataset}.google_ads_report_channel`
+    EOT
+    use_legacy_sql = false
   }
 }
 
@@ -68,10 +85,27 @@ resource "google_bigquery_table" "google_ads_exclusions" {
 resource "google_bigquery_table" "youtube_channel" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  table_id            = "YouTubeChannel"
+  table_id            = "youtube_channel"
   deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_channel.json")
+}
+
+resource "google_bigquery_table" "youtube_channel_legacy_alias" {
+  project             = "${var.project_id}"
+  table_id            = "YouTubeChannel"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.youtube_channel
+  ]
+  view {
+    query          = <<-EOT
+      SELECT * FROM `${var.project_id}.${var.bq_dataset}.youtube_channel`
+    EOT
+    use_legacy_sql = false
+  }
 }
 
 resource "google_bigquery_table" "youtube_video" {
@@ -346,6 +380,68 @@ resource "google_bigquery_table" "google_ads_report_video_aggregated" {
       FROM latest_adgroup_placements l
       JOIN first_seen_timeline t
         ON l.customer_id = t.customer_id AND l.video_id = t.video_id
+      GROUP BY 1, 2, t.first_seen, t.last_seen
+    EOT
+    use_legacy_sql = false
+  }
+}
+
+resource "google_bigquery_table" "google_ads_report_channel_aggregated" {
+  project             = "${var.project_id}"
+  table_id            = "GoogleAdsReportChannelAggregated"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.google_ads_report_channel
+  ]
+  view {
+    query          = <<-EOT
+      WITH latest_adgroup_placements AS (
+        SELECT
+          customer_id,
+          campaign_id,
+          ad_group_id,
+          channel_id,
+          youtube_channel_name,
+          placement_target_url,
+          impressions,
+          cost_micros,
+          conversions,
+          video_views,
+          clicks,
+          datetime_updated
+        FROM `${var.project_id}.${var.bq_dataset}.google_ads_report_channel`
+        QUALIFY ROW_NUMBER() OVER (
+          PARTITION BY customer_id, COALESCE(CAST(campaign_id AS STRING), ''), COALESCE(CAST(ad_group_id AS STRING), ''), channel_id 
+          ORDER BY datetime_updated DESC
+        ) = 1
+      ),
+      first_seen_timeline AS (
+        SELECT
+          customer_id,
+          channel_id,
+          MIN(datetime_updated) AS first_seen,
+          MAX(datetime_updated) AS last_seen
+        FROM `${var.project_id}.${var.bq_dataset}.google_ads_report_channel`
+        GROUP BY 1, 2
+      )
+      SELECT
+        l.customer_id,
+        l.channel_id,
+        ANY_VALUE(l.youtube_channel_name) AS youtube_channel_name,
+        ANY_VALUE(l.placement_target_url) AS placement_target_url,
+        SUM(l.impressions) AS impressions,
+        SUM(l.cost_micros) AS cost_micros,
+        SUM(l.conversions) AS conversions,
+        SUM(l.video_views) AS video_views,
+        SUM(l.clicks) AS clicks,
+        COALESCE(SAFE_DIVIDE(SUM(l.conversions), SUM(l.clicks)), 0.0) AS all_conversions_from_interactions_rate,
+        t.first_seen,
+        t.last_seen
+      FROM latest_adgroup_placements l
+      JOIN first_seen_timeline t
+        ON l.customer_id = t.customer_id AND l.channel_id = t.channel_id
       GROUP BY 1, 2, t.first_seen, t.last_seen
     EOT
     use_legacy_sql = false
