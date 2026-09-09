@@ -52,5 +52,23 @@
     "type": "TIMESTAMP",
     "mode": "REQUIRED",
     "description": "The datetime the data was pulled from YouTube"
+  },
+  {
+    "name": "description",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The description of the YouTube channel"
+  },
+  {
+    "name": "custom_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The custom handle or URL of the YouTube channel"
+  },
+  {
+    "name": "thumbnail_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The URL of the channel's high resolution thumbnail"
   }
 ]

@@ -150,8 +150,6 @@ def test_parse_pubsub_cloudevent_empty_or_malformed_returns_none():
   assert parse_pubsub_cloudevent(event_invalid_json) is None
 
 
-
-
 def test_write_ndjson_to_bq_executes_load_job():
   """Test writing NDJSON buffer to BigQuery."""
   mock_client = mock.MagicMock(spec=bigquery.Client)
@@ -203,6 +201,47 @@ def test_upsert_ndjson_to_bq_creates_staging_merges_and_drops():
   mock_client.create_table.assert_called_once()
   mock_client.load_table_from_file.assert_called_once()
   mock_client.query.assert_called_once()
+  query_arg = mock_client.query.call_args[0][0]
+  assert 'TIMESTAMP_TRUNC' in query_arg
+  mock_client.delete_table.assert_called_once()
+
+
+def test_upsert_ndjson_to_bq_unpartitioned_creates_staging_merges_and_drops():
+  """Test upserting NDJSON buffer into BigQuery without partition scoping (dimension table)."""
+  mock_client = mock.MagicMock(spec=bigquery.Client)
+  mock_table = mock.MagicMock()
+  mock_table.schema = [
+      bigquery.SchemaField('channel_id', 'STRING'),
+      bigquery.SchemaField('title', 'STRING'),
+  ]
+  mock_client.get_table.return_value = mock_table
+
+  mock_load_job = mock.MagicMock()
+  mock_load_job.output_rows = 3
+  mock_client.load_table_from_file.return_value = mock_load_job
+
+  mock_merge_job = mock.MagicMock()
+  mock_client.query.return_value = mock_merge_job
+
+  buf = io.BytesIO(b'{"channel_id": "c1", "title": "Channel 1"}\n')
+
+  rows = upsert_ndjson_to_bq(
+      client=mock_client,
+      ndjson_buffer=buf,
+      project_id='test-proj',
+      dataset_id='test-ds',
+      table_name='youtube_channel',
+      key_columns=['channel_id'],
+      partition_date=None,
+  )
+
+  assert rows == 3
+  mock_client.create_table.assert_called_once()
+  mock_client.load_table_from_file.assert_called_once()
+  mock_client.query.assert_called_once()
+  query_arg = mock_client.query.call_args[0][0]
+  assert 'target.channel_id = source.channel_id' in query_arg
+  assert 'TIMESTAMP_TRUNC' not in query_arg
   mock_client.delete_table.assert_called_once()
 
 

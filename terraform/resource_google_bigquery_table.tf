@@ -85,10 +85,27 @@ resource "google_bigquery_table" "google_ads_exclusions" {
 resource "google_bigquery_table" "youtube_channel" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  table_id            = "YouTubeChannel"
+  table_id            = "youtube_channel"
   deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_channel.json")
+}
+
+resource "google_bigquery_table" "youtube_channel_legacy_alias" {
+  project             = "${var.project_id}"
+  table_id            = "YouTubeChannel"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.youtube_channel
+  ]
+  view {
+    query          = <<-EOT
+      SELECT * FROM `${var.project_id}.${var.bq_dataset}.youtube_channel`
+    EOT
+    use_legacy_sql = false
+  }
 }
 
 resource "google_bigquery_table" "youtube_video" {
