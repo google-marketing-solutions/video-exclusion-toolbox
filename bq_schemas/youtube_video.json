@@ -92,5 +92,24 @@
     "type": "TIMESTAMP",
     "mode": "REQUIRED",
     "description": "The datetime the data was pulled from YouTube"
+  },
+  {
+    "name": "availability_status",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "defaultValueExpression": "'ACTIVE'",
+    "description": "Lifecycle state: ACTIVE, DELETED, PRIVATED, RESTRICTED, or UNKNOWN"
+  },
+  {
+    "name": "unavailable_reason",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Details: NOT_FOUND_ON_YOUTUBE, HTTP_404_MEDIA, ACCOUNT_TERMINATED, etc."
+  },
+  {
+    "name": "last_checked_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "Timestamp of most recent YouTube API or media verification"
   }
 ]

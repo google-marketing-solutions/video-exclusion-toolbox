@@ -17,33 +17,6 @@
 
 
 
-resource "google_cloudfunctions_function" "youtube_video" {
-  region                = var.region
-  name                  = "vid-excl-youtube_videos"
-  description           = "Pull the video data from the YouTube API."
-  runtime               = "python311"
-  source_archive_bucket = google_storage_bucket.source_archive.name
-  source_archive_object = google_storage_bucket_object.youtube_video.name
-  service_account_email = google_service_account.video_exclusion_toolbox.email
-  build_service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.video_exclusion_toolbox.email}"
-  timeout               = 540
-  available_memory_mb   = 4096
-  entry_point           = "main"
-  depends_on = [
-    resource.time_sleep.wait_60_seconds_after_role_assignment,
-    resource.google_storage_bucket_object.youtube_video
-  ]
-
-  event_trigger {
-    event_type = "providers/cloud.pubsub/eventTypes/topic.publish"
-    resource   = google_pubsub_topic.youtube_video.name
-  }
-
-  environment_variables = {
-    GOOGLE_CLOUD_PROJECT      = var.project_id
-    VID_EXCL_BIGQUERY_DATASET = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  }
-}
 
 
 resource "google_cloudfunctions_function" "youtube_thumbnails_dispatch" {

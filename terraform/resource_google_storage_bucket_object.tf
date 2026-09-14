@@ -67,12 +67,12 @@ resource "google_storage_bucket_object" "yt_channel_fetcher" {
     resource.google_storage_bucket.source_archive
   ]
 }
-resource "google_storage_bucket_object" "youtube_video" {
-  name   = "youtube_video_${data.archive_file.youtube_video.output_md5}.zip"
+resource "google_storage_bucket_object" "yt_video_fetcher" {
+  name   = "yt_video_fetcher_${data.archive_file.yt_video_fetcher.output_md5}.zip"
   bucket = google_storage_bucket.source_archive.name
-  source = data.archive_file.youtube_video.output_path
+  source = data.archive_file.yt_video_fetcher.output_path
   depends_on = [
-    data.archive_file.youtube_video,
+    data.archive_file.yt_video_fetcher,
     resource.google_storage_bucket.source_archive
   ]
 }

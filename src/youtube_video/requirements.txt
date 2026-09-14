@@ -1,5 +1,0 @@
-google-api-python-client==2.111.0
-google-cloud-bigquery==3.14.1
-jsonschema==4.20.0
-pandas==2.1.4
-db-dtypes==1.2.0

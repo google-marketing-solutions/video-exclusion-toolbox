@@ -119,11 +119,25 @@ data "archive_file" "yt_channel_fetcher" {
   }
   depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
-data "archive_file" "youtube_video" {
+data "archive_file" "yt_video_fetcher" {
   type        = "zip"
-  output_path = ".temp/youtube_video.zip"
-  source_dir  = "../src/youtube_video/"
-  depends_on  = [resource.google_project_iam_member.storage_object_admin]
+  output_path = ".temp/yt_video_fetcher.zip"
+  source {
+    content  = file("../src/yt_video_fetcher/main.py")
+    filename = "main.py"
+  }
+  source {
+    content  = "${file("../src/common_requirements.txt")}\n${file("../src/yt_video_fetcher/requirements.txt")}"
+    filename = "requirements.txt"
+  }
+  dynamic "source" {
+    for_each = local.vet_common_sources
+    content {
+      filename = source.key
+      content  = source.value
+    }
+  }
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
 data "archive_file" "youtube_thumbnails_dispatch" {
   type        = "zip"
