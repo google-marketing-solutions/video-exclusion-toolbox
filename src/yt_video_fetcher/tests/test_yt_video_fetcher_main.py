@@ -256,6 +256,66 @@ def test_fetch_video_metadata_from_youtube_tombstone_handling():
   assert rec['last_checked_at'] == '2026-09-10T12:00:00Z'
 
 
+def test_fetch_video_metadata_from_youtube_item_without_id_is_skipped():
+  """Tests that a malformed API item lacking an 'id' is skipped, not crashed on.
+
+  The item is discarded rather than partially written, so the requested video
+  still falls through to tombstone handling and is not silently lost.
+  """
+  mock_youtube = mock.MagicMock()
+  mock_request = mock.MagicMock()
+  mock_youtube.videos().list.return_value = mock_request
+  mock_request.execute.return_value = {
+      'items': [
+          {'snippet': {'title': 'Orphan item with no id'}},
+          {
+              'id': 'vid_ok',
+              'snippet': {'title': 'Good video', 'publishedAt': '2026-01-01'},
+          },
+      ]
+  }
+
+  records = main.fetch_video_metadata_from_youtube(
+      youtube_service=mock_youtube,
+      video_ids=['vid_ok', 'vid_missing'],
+      now_iso='2026-09-10T12:00:00Z',
+  )
+
+  by_id = {r['video_id']: r for r in records}
+  # The orphan contributed no record of its own.
+  assert set(by_id) == {'vid_ok', 'vid_missing'}
+  assert by_id['vid_ok']['availability_status'] == 'ACTIVE'
+  # vid_missing was requested but never returned, so it is tombstoned.
+  assert by_id['vid_missing']['availability_status'] == 'DELETED'
+
+
+@mock.patch.object(main.discovery, 'build')
+@mock.patch.object(main.google.auth, 'default')
+def test_build_youtube_service_requests_readonly_scope(
+    mock_auth_default, mock_build
+):
+  """Tests the YouTube client is built with the read-only scope.
+
+  A wrong scope or API version fails only at runtime against real credentials,
+  so it is pinned here.
+  """
+  mock_credentials = mock.MagicMock()
+  mock_auth_default.return_value = (mock_credentials, 'test-project')
+
+  service = main._build_youtube_service()  # pylint: disable=protected-access
+
+  mock_auth_default.assert_called_once_with(
+      scopes=['https://www.googleapis.com/auth/youtube.readonly']
+  )
+  mock_build.assert_called_once_with(
+      'youtube',
+      'v3',
+      credentials=mock_credentials,
+      cache_discovery=False,
+  )
+  assert service is mock_build.return_value
+
+
 def test_fetch_video_metadata_from_youtube_handles_null_statistics():
   """Tests graceful fallback when statistics or contentDetails are null."""
   mock_youtube = mock.MagicMock()
@@ -380,6 +440,78 @@ def test_run_successful_fetch_and_upsert(
   mock_upsert_bq.assert_called_once()
   assert mock_upsert_bq.call_args[1]['key_columns'] == ['video_id']
   assert mock_upsert_bq.call_args[1]['partition_date'] is None
+
+
+@mock.patch.object(main, 'publish_batch', autospec=True)
+@mock.patch.object(main, 'DOWNSTREAM_TOPIC', 'test-downstream-topic')
+@mock.patch.object(main, 'upsert_ndjson_to_bq')
+@mock.patch.object(main, 'fetch_video_metadata_from_youtube')
+@mock.patch.object(main, '_build_youtube_service')
+@mock.patch.object(main, 'get_unprocessed_video_ids')
+@mock.patch.object(main.bigquery, 'Client')
+def test_run_downstream_topic_configured_publishes_with_topic_id(
+    mock_bq_client_cls,
+    mock_get_unprocessed,
+    mock_build_yt,
+    mock_fetch_yt,
+    mock_upsert_bq,
+    mock_publish_batch,
+):
+  """Tests that the downstream notification uses publish_batch's real signature.
+
+  The mock is autospecced, so passing an argument name that does not exist on
+  vet_common.pubsub.publish_batch raises TypeError here rather than at runtime
+  in production. This branch is dead in the current deployment because
+  VID_EXCL_THUMBNAILS_PUBSUB_TOPIC is not set in Terraform, so it needs
+  explicit coverage.
+  """
+  mock_get_unprocessed.return_value = ['vid_1']
+  mock_fetch_yt.return_value = [{
+      'video_id': 'vid_1',
+      'title': 'Video 1',
+      'datetime_updated': '2026-09-10T12:00:00Z',
+  }]
+
+  count = main.run(
+      date_partition='2026-09-10', customer_id='1234567890', run_id='test-run'
+  )
+
+  assert count == 1
+  mock_publish_batch.assert_called_once()
+  kwargs = mock_publish_batch.call_args[1]
+  assert kwargs['topic_id'] == 'test-downstream-topic'
+  assert kwargs['messages'] == [{'video_ids': ['vid_1']}]
+
+
+@mock.patch.object(main, 'publish_batch', autospec=True)
+@mock.patch.object(main, 'DOWNSTREAM_TOPIC', None)
+@mock.patch.object(main, 'upsert_ndjson_to_bq')
+@mock.patch.object(main, 'fetch_video_metadata_from_youtube')
+@mock.patch.object(main, '_build_youtube_service')
+@mock.patch.object(main, 'get_unprocessed_video_ids')
+@mock.patch.object(main.bigquery, 'Client')
+def test_run_downstream_topic_unset_skips_publish(
+    mock_bq_client_cls,
+    mock_get_unprocessed,
+    mock_build_yt,
+    mock_fetch_yt,
+    mock_upsert_bq,
+    mock_publish_batch,
+):
+  """Tests that no downstream publish occurs when the topic is not configured."""
+  mock_get_unprocessed.return_value = ['vid_1']
+  mock_fetch_yt.return_value = [{
+      'video_id': 'vid_1',
+      'title': 'Video 1',
+      'datetime_updated': '2026-09-10T12:00:00Z',
+  }]
+
+  count = main.run(
+      date_partition='2026-09-10', customer_id='1234567890', run_id='test-run'
+  )
+
+  assert count == 1
+  mock_publish_batch.assert_not_called()
 
 
 @mock.patch.object(main, 'run')

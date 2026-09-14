@@ -345,7 +345,7 @@ def run(
   if DOWNSTREAM_TOPIC:
     publish_batch(
         project_id=GOOGLE_CLOUD_PROJECT,
-        topic_name=DOWNSTREAM_TOPIC,
+        topic_id=DOWNSTREAM_TOPIC,
         messages=[{'video_ids': [r['video_id'] for r in records]}],
         logger=logger,
     )
