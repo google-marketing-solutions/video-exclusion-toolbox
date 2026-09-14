@@ -213,6 +213,55 @@ resource "google_cloudfunctions2_function" "yt_channel_fetcher" {
   ]
 }
 
+resource "google_cloudfunctions2_function" "yt_video_fetcher" {
+  location    = var.region
+  name        = "vet-yt-video-fetcher"
+  description = "Pull YouTube video metadata for placements in Google Ads reports."
+
+  service_config {
+    max_instance_count               = 10
+    min_instance_count               = 0
+    available_memory                 = "1Gi"
+    timeout_seconds                  = 540
+    available_cpu                    = "1"
+    max_instance_request_concurrency = 1
+    environment_variables = {
+      GOOGLE_CLOUD_PROJECT      = var.project_id
+      VID_EXCL_BIGQUERY_DATASET = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+      VET_BIGQUERY_SOURCE_TABLE = google_bigquery_table.google_ads_report_video.table_id
+      VET_BIGQUERY_TARGET_TABLE = google_bigquery_table.youtube_video.table_id
+    }
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    service_account_email          = google_service_account.video_exclusion_toolbox.email
+    all_traffic_on_latest_revision = true
+  }
+
+  build_config {
+    runtime         = "python314"
+    entry_point     = "main"
+    service_account = google_service_account.video_exclusion_toolbox.id
+    source {
+      storage_source {
+        bucket = google_storage_bucket.source_archive.name
+        object = google_storage_bucket_object.yt_video_fetcher.name
+      }
+    }
+  }
+
+  event_trigger {
+    trigger_region        = var.region
+    event_type            = "google.cloud.pubsub.topic.v1.messagePublished"
+    pubsub_topic          = google_pubsub_topic.youtube_video.id
+    retry_policy          = "RETRY_POLICY_RETRY"
+    service_account_email = google_service_account.video_exclusion_toolbox.email
+  }
+
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.yt_video_fetcher
+  ]
+}
+
 resource "google_cloudfunctions2_function" "google_ads_exclusions_fetcher" {
   location    = var.region
   name        = "vet-google-ads-exclusions-fetcher"

@@ -111,10 +111,27 @@ resource "google_bigquery_table" "youtube_channel_legacy_alias" {
 resource "google_bigquery_table" "youtube_video" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  table_id            = "YouTubeVideo"
+  table_id            = "youtube_video"
   deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_video.json")
+}
+
+resource "google_bigquery_table" "youtube_video_legacy_alias" {
+  project             = "${var.project_id}"
+  table_id            = "YouTubeVideo"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.youtube_video
+  ]
+  view {
+    query          = <<-EOT
+      SELECT * FROM `${var.project_id}.${var.bq_dataset}.youtube_video`
+    EOT
+    use_legacy_sql = false
+  }
 }
 
 resource "google_bigquery_table" "youtube_thumbnails" {
@@ -279,7 +296,7 @@ resource "google_bigquery_table" "ads_and_youtube_and_channels" {
         CONCAT('https://www.',youtube_video_url) as video_url,
         CONCAT('https://www.',youtube_channel_url) as channel_url,
         Video.title,
-        description,
+        Video.description,
         impressions,
         cost_micros,
         conversions,

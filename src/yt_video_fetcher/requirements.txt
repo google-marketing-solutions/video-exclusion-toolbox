@@ -1,0 +1,1 @@
+# Requirements for yt_video_fetcher (extends common_requirements.txt)
