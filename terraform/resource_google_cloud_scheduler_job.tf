@@ -24,6 +24,15 @@ locals {
         "processing_limit": "${var.age_evaluation_processing_limit}"
     }
     EOF
+  # The matcher does not take a sheet_id: it reads the keywords through the
+  # exclusion_keywords external table, which is already bound to the sheet.
+  # The acknowledgement flag is sent explicitly at false so that the waiver
+  # exists visibly in config; a run that needs it is set by hand, once.
+  keyword_matcher_scheduler_body = <<EOF
+    {
+        "ack_keyword_set_change": false
+    }
+    EOF
 }
 
 resource "google_cloud_scheduler_job" "gads_dispatch_accounts" {
@@ -65,6 +74,32 @@ resource "google_cloud_scheduler_job" "vet_evaluate_thumbnail_age" {
     }
     oidc_token {
       audience              = "${google_cloudfunctions2_function.youtube_thumbnails_evaluate_age_dispatcher.service_config[0].uri}/"
+      service_account_email = google_service_account.video_exclusion_toolbox.email
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "vet_keyword_match" {
+  name        = "vet-keyword-match"
+  description = "Detects advertiser exclusion keywords in YouTube video and channel text."
+  # Twenty past the hour, clear of the account dispatch at 0 and the thumbnail
+  # age evaluation at 10 and 40, so the three do not contend for slots.
+  schedule  = "20 * * * *"
+  time_zone = "Etc/UTC"
+  # Exceeds the function's own 300s timeout, so the function is always the one
+  # that gives up first.
+  attempt_deadline = "320s"
+  region           = var.region
+
+  http_target {
+    http_method = "POST"
+    uri         = google_cloudfunctions2_function.keyword_matcher.service_config[0].uri
+    body        = base64encode(local.keyword_matcher_scheduler_body)
+    headers = {
+      "Content-Type" = "application/json"
+    }
+    oidc_token {
+      audience              = "${google_cloudfunctions2_function.keyword_matcher.service_config[0].uri}/"
       service_account_email = google_service_account.video_exclusion_toolbox.email
     }
   }

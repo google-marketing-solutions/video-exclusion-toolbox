@@ -52,7 +52,7 @@ class MockCloudEvent:
     ('raw_id', 'expected'),
     [
         ('123-456-7890', '1234567890'),
-        ('805-652-0078', '8056520078'),
+        ('999-888-7777', '9998887777'),
         (1234567890, '1234567890'),
         ('  123-456-7890  ', '1234567890'),
         ('n/a', ''),
@@ -324,7 +324,7 @@ def test_pipeline_telemetry_context_failure_logging():
   """Test PipelineTelemetryContext logging a failed step."""
   mock_logger = mock.MagicMock(spec=logging.Logger)
   telemetry = PipelineTelemetryContext(logger=mock_logger)
-  telemetry.set_customer_id('8056520078')
+  telemetry.set_customer_id('9998887777')
 
   err = ValueError('Invalid argument provided')
   payload = telemetry.log_step(
@@ -334,7 +334,7 @@ def test_pipeline_telemetry_context_failure_logging():
   )
 
   assert payload['status'] == 'FAILED'
-  assert payload['customer_id'] == '8056520078'
+  assert payload['customer_id'] == '9998887777'
   assert payload['error_type'] == 'ValueError'
   assert payload['error_message'] == 'Invalid argument provided'
 
