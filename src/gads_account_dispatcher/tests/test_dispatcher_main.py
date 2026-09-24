@@ -56,8 +56,8 @@ def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
   raw_mcc_id_1 = '999-888-7777'
   expected_mcc_id_1 = '9998887777'
 
-  raw_customer_id_2 = '356-029-6721'
-  expected_customer_id_2 = '3560296721'
+  raw_customer_id_2 = '222-333-4444'
+  expected_customer_id_2 = '2223334444'
 
   raw_filter_row = ['clicks', '>', '5']
   expected_gads_filters = 'metrics.clicks > 5'
@@ -77,7 +77,7 @@ def test_get_config_from_sheet_valid_sheet_returns_customer_configs(
           'values': [
               [raw_customer_id_1, 'Enabled', raw_mcc_id_1],
               ['111-222-3333', 'Disabled', '444-555-6666'],
-              ['723-928-2798', 'Disabled'],
+              ['555-666-7777', 'Disabled'],
               [raw_customer_id_2, 'Enabled'],
           ]
       }

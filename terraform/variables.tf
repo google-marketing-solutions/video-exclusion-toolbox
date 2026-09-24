@@ -106,3 +106,27 @@ variable "age_evaluation_processing_limit" {
   description = "The number of videos to process for age evaluation in one batch."
   default     = 1000
 }
+
+variable "keyword_min_retention_ratio" {
+  type        = number
+  description = "Keyword matcher circuit breaker: the minimum fraction of the previous run's detections that the shared keywords must still yield before the run is allowed to commit."
+  default     = 0.9
+
+  validation {
+    condition     = var.keyword_min_retention_ratio >= 0.0 && var.keyword_min_retention_ratio <= 1.0
+    error_message = "keyword_min_retention_ratio must be between 0.0 and 1.0."
+  }
+}
+
+variable "keyword_min_keyword_retention_ratio" {
+  type        = number
+  description = "Keyword matcher circuit breaker: the minimum fraction of the previous keyword set that must still be present before the run is allowed to commit without an explicit acknowledgement."
+  default     = 0.9
+
+  validation {
+    condition     = var.keyword_min_keyword_retention_ratio >= 0.0 && var.keyword_min_keyword_retention_ratio <= 1.0
+    error_message = "keyword_min_keyword_retention_ratio must be between 0.0 and 1.0."
+  }
+}
+
+
