@@ -1,0 +1,62 @@
+[
+  {
+    "name": "policy_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Stable identifier for the policy row."
+  },
+  {
+    "name": "entity_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Restricts the policy to 'video' or 'channel'. NULL matches any entity type."
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Restricts the policy to one detection source. NULL matches any source."
+  },
+  {
+    "name": "detector",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Restricts the policy to one detector. NULL matches any detector."
+  },
+  {
+    "name": "taxonomy_prefix",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Prefix-matched against detection.taxonomy, so 'advertiser_blocklist.' covers the whole subtree. NULL matches any taxonomy."
+  },
+  {
+    "name": "min_score",
+    "type": "FLOAT",
+    "mode": "NULLABLE",
+    "description": "Minimum detector score for the policy to apply. NULL means no threshold, which is what deterministic detectors need."
+  },
+  {
+    "name": "action",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "What to do with matching detections: 'exclude', 'shadow', 'review' or 'ignore'."
+  },
+  {
+    "name": "priority",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "Where several policies match the same detection, the highest priority wins."
+  },
+  {
+    "name": "enabled",
+    "type": "BOOLEAN",
+    "mode": "REQUIRED",
+    "description": "Whether the policy is in force. Disabling is preferred over deleting."
+  },
+  {
+    "name": "notes",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Free text explaining why the policy exists."
+  }
+]

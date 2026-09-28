@@ -122,6 +122,16 @@ resource "google_storage_bucket_object" "youtube_thumbnails_evaluate_age_process
   ]
 }
 
+resource "google_storage_bucket_object" "keyword_matcher" {
+  name   = "keyword_matcher_${data.archive_file.keyword_matcher.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.keyword_matcher.output_path
+  depends_on = [
+    data.archive_file.keyword_matcher,
+    resource.google_storage_bucket.source_archive
+  ]
+}
+
 ########################## Auxiliary Bucket Objects ############################
 resource "google_storage_bucket_object" "categories_lookup" {
   name         = "categories_lookup.csv"

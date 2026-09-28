@@ -20,6 +20,7 @@ out/
 
 # Python
 __pycache__
+.pytest_cache/
 
 # Google Cloud credentials
 creds.json
@@ -32,6 +33,7 @@ reconciliation/
 deployed-infra-documentation/
 GEMINI.md
 docs/*-internal.md
+docs/environment_standard.md
 
 # Google internal metadata files
 GTECH

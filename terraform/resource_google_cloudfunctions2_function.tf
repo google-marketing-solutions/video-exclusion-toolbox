@@ -409,3 +409,64 @@ resource "google_cloudfunctions2_function" "youtube_thumbnails_evaluate_age_proc
     resource.google_storage_bucket_object.youtube_thumbnails_evaluate_age_processor
   ]
 }
+
+resource "google_cloudfunctions2_function" "keyword_matcher" {
+  location    = var.region
+  name        = "vet-keyword-matcher"
+  description = "Detects advertiser exclusion keywords in YouTube video and channel text."
+
+  service_config {
+    # Pinned to a single instance. Two concurrent runs would MERGE into the
+    # same detection rows, and the circuit breaker compares against the
+    # previous run's counts, which is only meaningful if runs are serialised.
+    max_instance_count = 1
+    # Zero rather than the one used elsewhere: this runs once an hour on a
+    # schedule, so there is nothing for a warm instance to serve in between.
+    min_instance_count = 0
+    # Below the 1Gi used by the other functions, deliberately. All matching
+    # happens inside BigQuery: this function reads the keyword list, sends
+    # compiled pattern strings as query parameters, and then blocks waiting on
+    # the job. The corpus never crosses the wire, so the process is I/O-bound.
+    available_memory                 = "512Mi"
+    available_cpu                    = "1"
+    max_instance_request_concurrency = 1
+    # Sized below the scheduler's 320s attempt deadline so the function gives up
+    # first and any timeout is attributed to the function rather than the
+    # scheduler.
+    timeout_seconds = 300
+    environment_variables = {
+      GOOGLE_CLOUD_PROJECT            = var.project_id
+      VET_BIGQUERY_DATASET            = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+      VET_VIDEO_CORPUS_TABLE          = google_bigquery_table.youtube_video.table_id
+      VET_CHANNEL_CORPUS_TABLE        = google_bigquery_table.youtube_channel.table_id
+      VET_KEYWORD_TABLE               = google_bigquery_table.exclusion_keywords.table_id
+      VET_DETECTION_TABLE             = google_bigquery_table.detection.table_id
+      VET_MIN_RETENTION_RATIO         = tostring(var.keyword_min_retention_ratio)
+      VET_MIN_KEYWORD_RETENTION_RATIO = tostring(var.keyword_min_keyword_retention_ratio)
+    }
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    service_account_email          = google_service_account.video_exclusion_toolbox.email
+    all_traffic_on_latest_revision = true
+  }
+
+  build_config {
+    runtime         = "python314"
+    entry_point     = "main"
+    service_account = google_service_account.video_exclusion_toolbox.id
+    source {
+      storage_source {
+        bucket = google_storage_bucket.source_archive.name
+        object = google_storage_bucket_object.keyword_matcher.name
+      }
+    }
+  }
+
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.keyword_matcher,
+    resource.google_bigquery_table.youtube_video,
+    resource.google_bigquery_table.youtube_channel,
+    resource.google_bigquery_table.exclusion_keywords,
+    resource.google_bigquery_table.detection
+  ]
+}

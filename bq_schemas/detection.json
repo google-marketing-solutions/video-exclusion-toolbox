@@ -1,0 +1,86 @@
+[
+  {
+    "name": "entity_type",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The kind of entity the detection is about: 'video' or 'channel'."
+  },
+  {
+    "name": "entity_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The YouTube video ID or channel ID."
+  },
+  {
+    "name": "modality",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The text the detection was made in: 'title', 'description' or 'tags'."
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Where the signal came from. Currently always 'first_party'."
+  },
+  {
+    "name": "detector",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The detector that produced the row. Currently always 'keyword_match'."
+  },
+  {
+    "name": "detector_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Hand-maintained version of the detection rules, bumped whenever pattern construction changes, so rows written under different rules can be told apart after the fact."
+  },
+  {
+    "name": "taxonomy",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The classification namespace the label belongs to. Currently always 'advertiser_blocklist.keyword'. Consumers filter on this rather than on detector identity."
+  },
+  {
+    "name": "label",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "The matched keyword, in its normalised (trimmed, lowercased) form."
+  },
+  {
+    "name": "score",
+    "type": "FLOAT",
+    "mode": "NULLABLE",
+    "description": "Detector confidence. NULL for the keyword detector, which is deterministic."
+  },
+  {
+    "name": "evidence",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "Detector-specific supporting detail. Unused by the keyword detector."
+  },
+  {
+    "name": "first_detected_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When this detection was first observed. Preserved across merges."
+  },
+  {
+    "name": "last_detected_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When this detection was most recently observed."
+  },
+  {
+    "name": "expires_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "When the detection should stop being treated as current. Unused by the keyword detector."
+  },
+  {
+    "name": "retracted_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "When the detection was withdrawn, e.g. because its keyword left the sheet. Rows are retracted rather than deleted so history survives."
+  }
+]

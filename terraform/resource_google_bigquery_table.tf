@@ -153,25 +153,114 @@ resource "google_bigquery_table" "youtube_thumbnail_cropouts" {
 }
 
 
+########################## Keyword Compatibility Views #########################
+# Compatibility views over the detection table exposing matched keywords in a
+# comma-joined format per entity.
+#
+# They apply no policy filtering, deliberately: their name says "with matched
+# keywords", not "to exclude", and that distinction is the whole point of
+# splitting observation from policy. The ToExclude views below are where
+# detection_policy is consulted.
 resource "google_bigquery_table" "videos_with_matched_keywords" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "VideosWithMatchedKeywords"
-  description         = "This table is populated by the 'identify_videos_with_kewords' stored procedure."
-  deletion_protection = true
-  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
-  schema              = file("../bq_schemas/videos_with_matched_keywords.json")
+  description         = "Videos with at least one exclusion keyword detected, in the legacy comma-joined shape. A view over the detection table."
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.detection
+  ]
+  view {
+    query          = <<-EOT
+      WITH detections AS (
+        SELECT
+          entity_id,
+          STRING_AGG(DISTINCT IF(modality = 'title', label, NULL), ', ') AS title_match,
+          STRING_AGG(DISTINCT IF(modality = 'description', label, NULL), ', ') AS description_match,
+          STRING_AGG(DISTINCT IF(modality = 'tags', label, NULL), ', ') AS tags_match
+        FROM `${var.project_id}.${var.bq_dataset}.detection`
+        WHERE entity_type = 'video'
+          AND detector = 'keyword_match'
+          AND retracted_at IS NULL
+        GROUP BY entity_id
+      ),
+      videos AS (
+        SELECT
+          video_id,
+          channelId AS channel_id,
+          title,
+          description,
+          ARRAY_TO_STRING(tags, ', ') AS tags
+        FROM `${var.project_id}.${var.bq_dataset}.youtube_video`
+        -- Deduplicate to the latest snapshot per video_id, matching the
+        -- deduplication applied by the keyword matcher.
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY video_id ORDER BY datetime_updated DESC) = 1
+      )
+      SELECT
+        d.entity_id AS video_id,
+        CONCAT('https://www.youtube.com/watch?v=', d.entity_id) AS video_url,
+        v.channel_id AS channel_id,
+        v.title AS title,
+        v.description AS description,
+        v.tags AS tags,
+        d.title_match AS title_match,
+        d.description_match AS description_match,
+        d.tags_match AS tags_match
+      FROM detections AS d
+      LEFT JOIN videos AS v ON v.video_id = d.entity_id
+    EOT
+    use_legacy_sql = false
+  }
 }
-
 
 resource "google_bigquery_table" "channels_with_matched_keywords" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "ChannelsWithMatchedKeywords"
-  description         = "This table is populated by the 'identify_channels_with_kewords' stored procedure."
-  deletion_protection = true
-  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
-  schema              = file("../bq_schemas/channels_with_matched_keywords.json")
+  description         = "Channels with at least one exclusion keyword detected, in the legacy comma-joined shape. A view over the detection table."
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.detection
+  ]
+  view {
+    query          = <<-EOT
+      WITH detections AS (
+        SELECT
+          entity_id,
+          STRING_AGG(DISTINCT IF(modality = 'title', label, NULL), ', ') AS title_match,
+          STRING_AGG(DISTINCT IF(modality = 'description', label, NULL), ', ') AS description_match
+        FROM `${var.project_id}.${var.bq_dataset}.detection`
+        WHERE entity_type = 'channel'
+          AND detector = 'keyword_match'
+          AND retracted_at IS NULL
+        GROUP BY entity_id
+      ),
+      channels AS (
+        SELECT
+          channel_id,
+          custom_url,
+          title,
+          description
+        FROM `${var.project_id}.${var.bq_dataset}.youtube_channel`
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY channel_id ORDER BY datetime_updated DESC) = 1
+      )
+      SELECT
+        d.entity_id AS channel_id,
+        CONCAT('https://www.youtube.com/channel/', d.entity_id) AS channel_url,
+        c.custom_url AS channel_custom_handle,
+        c.title AS title,
+        c.description AS description,
+        d.title_match AS title_match,
+        d.description_match AS description_match
+      FROM detections AS d
+      LEFT JOIN channels AS c ON c.channel_id = d.entity_id
+    EOT
+    use_legacy_sql = false
+  }
 }
 
 resource "google_bigquery_table" "youtube_thumbnail_age_evaluation" {
@@ -181,6 +270,76 @@ resource "google_bigquery_table" "youtube_thumbnail_age_evaluation" {
   deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   schema              = file("../bq_schemas/youtube_thumbnail_age_evaluation.json")
+}
+
+############################### Detection Tables ###############################
+# The observation store. One row per entity, modality and label; that tuple is
+# the MERGE key. It is written by the keyword matcher and, in time, by other
+# detectors, which is why the detector and taxonomy are columns rather than
+# being implied by the table name.
+resource "google_bigquery_table" "detection" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "detection"
+  description         = "Detections made about YouTube entities, one row per entity, modality and label. Written by detectors; read by the policy views. Holds observations only - whether a detection leads to an exclusion is decided by detection_policy."
+  deletion_protection = true
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  schema              = file("../bq_schemas/detection.json")
+  # detector is placed early because each detector's MERGE touches only its own
+  # rows, so this is the key that prunes. Physical layout is specified here
+  # deliberately rather than left to default.
+  clustering = ["entity_type", "detector", "taxonomy", "entity_id"]
+}
+
+# The policy store. Separating this from detection is what allows the meaning
+# of a detection to change without recomputing it, and what keeps the
+# ToExclude views declarative.
+resource "google_bigquery_table" "detection_policy" {
+  project             = "${var.project_id}"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "detection_policy"
+  description         = "Decides which detections become exclusions. Rows are matched against detection on the non-NULL fields; among the matches the highest enabled priority wins."
+  deletion_protection = true
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  schema              = file("../bq_schemas/detection_policy.json")
+}
+
+locals {
+  seed_detection_policy_sql = <<-EOT
+    MERGE INTO `${var.project_id}.${google_bigquery_dataset.video_exclusion_toolbox.dataset_id}.${google_bigquery_table.detection_policy.table_id}` T
+    USING (
+      SELECT
+        'first_party_keyword_exclude' AS policy_id,
+        CAST(NULL AS STRING) AS entity_type,
+        'first_party' AS source,
+        'keyword_match' AS detector,
+        'advertiser_blocklist.' AS taxonomy_prefix,
+        CAST(NULL AS FLOAT64) AS min_score,
+        'exclude' AS action,
+        100 AS priority,
+        TRUE AS enabled,
+        'Default exclusion policy for first-party keyword matches' AS notes
+    ) S
+    ON T.policy_id = S.policy_id
+    WHEN NOT MATCHED THEN
+      INSERT (policy_id, entity_type, source, detector, taxonomy_prefix, min_score, action, priority, enabled, notes)
+      VALUES (S.policy_id, S.entity_type, S.source, S.detector, S.taxonomy_prefix, S.min_score, S.action, S.priority, S.enabled, S.notes)
+  EOT
+}
+
+resource "google_bigquery_job" "seed_detection_policy" {
+  project  = var.project_id
+  job_id   = "vet_seed_detection_policy_${substr(md5(local.seed_detection_policy_sql), 0, 8)}"
+  location = google_bigquery_dataset.video_exclusion_toolbox.location
+
+  query {
+    query              = local.seed_detection_policy_sql
+    use_legacy_sql     = false
+    create_disposition = ""
+    write_disposition  = ""
+  }
+
+  depends_on = [google_bigquery_table.detection_policy]
 }
 
 ############################## External BQ Tables ##############################
@@ -205,7 +364,7 @@ resource "google_bigquery_table" "youtube_category_lookup" {
 resource "google_bigquery_table" "exclusion_keywords" {
   project             = "${var.project_id}"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  table_id            = "ExclusionKeywords"
+  table_id            = "exclusion_keywords"
   deletion_protection = true
   depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
   external_data_configuration {
@@ -219,6 +378,23 @@ resource "google_bigquery_table" "exclusion_keywords" {
       range             = "exclusion_keywords!A:A"
       skip_leading_rows = "1"
     }
+  }
+}
+
+resource "google_bigquery_table" "exclusion_keywords_legacy_alias" {
+  project             = "${var.project_id}"
+  table_id            = "ExclusionKeywords"
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  deletion_protection = false
+  depends_on = [
+    google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.exclusion_keywords
+  ]
+  view {
+    query          = <<-EOT
+      SELECT * FROM `${var.project_id}.${var.bq_dataset}.exclusion_keywords`
+    EOT
+    use_legacy_sql = false
   }
 }
 
@@ -465,6 +641,15 @@ resource "google_bigquery_table" "google_ads_report_channel_aggregated" {
   }
 }
 
+############################ Policy-Filtered Views #############################
+# These are the downstream excluder interface: src/google_ads_excluder/main.py
+# reads them directly, so their output schemas are contractual and must not
+# change.
+#
+# A detection becomes an exclusion only if an enabled policy matches it. Where
+# several policies match, the highest priority decides, which is what allows a
+# narrow 'ignore' to override a broad 'exclude'. A plain WHERE action =
+# 'exclude' would have dropped that override on the floor.
 resource "google_bigquery_table" "videos_to_exclude" {
   project             = "${var.project_id}"
   table_id            = "VideosToExclude"
@@ -472,21 +657,76 @@ resource "google_bigquery_table" "videos_to_exclude" {
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
-    google_bigquery_table.videos_with_matched_keywords
+    google_bigquery_table.detection,
+    google_bigquery_table.detection_policy
   ]
   view {
     query          = <<-EOT
+      WITH policies AS (
+        SELECT * FROM `${var.project_id}.${var.bq_dataset}.detection_policy`
+        WHERE enabled
+      ),
+      -- One row per detection, carrying the action of the highest-priority
+      -- policy that matches it. A detection matched by no policy is dropped
+      -- by the inner join, which is the intended reading of "no policy".
+      classified AS (
+        SELECT
+          d.entity_id AS entity_id,
+          d.modality AS modality,
+          d.label AS label,
+          ARRAY_AGG(p.action ORDER BY p.priority DESC LIMIT 1)[OFFSET(0)] AS action
+        FROM `${var.project_id}.${var.bq_dataset}.detection` AS d
+        JOIN policies AS p
+          ON (p.entity_type IS NULL OR p.entity_type = d.entity_type)
+          AND (p.source IS NULL OR p.source = d.source)
+          AND (p.detector IS NULL OR p.detector = d.detector)
+          AND (p.taxonomy_prefix IS NULL OR STARTS_WITH(d.taxonomy, p.taxonomy_prefix))
+          AND (p.min_score IS NULL OR d.score >= p.min_score)
+        WHERE d.entity_type = 'video'
+          AND d.retracted_at IS NULL
+        GROUP BY d.entity_id, d.modality, d.label
+      ),
+      matched AS (
+        SELECT
+          entity_id,
+          STRING_AGG(DISTINCT IF(modality = 'title', label, NULL), ', ') AS title_match,
+          STRING_AGG(DISTINCT IF(modality = 'description', label, NULL), ', ') AS description_match,
+          STRING_AGG(DISTINCT IF(modality = 'tags', label, NULL), ', ') AS tags_match
+        FROM classified
+        WHERE action = 'exclude'
+        GROUP BY entity_id
+      ),
+      videos AS (
+        SELECT
+          video_id,
+          title,
+          description,
+          ARRAY_TO_STRING(tags, ', ') AS tags,
+          availability_status
+        FROM `${var.project_id}.${var.bq_dataset}.youtube_video`
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY video_id ORDER BY datetime_updated DESC) = 1
+      )
       SELECT
-        DISTINCT video_id, video_url, title, description, tags,
+        m.entity_id AS video_id,
+        CONCAT('https://www.youtube.com/watch?v=', m.entity_id) AS video_url,
+        v.title AS title,
+        v.description AS description,
+        v.tags AS tags,
+        -- CONCAT returns NULL for a NULL match and ARRAY_TO_STRING skips
+        -- NULLs, so a modality that matched nothing leaves no trace. This is
+        -- the behaviour of the original expression, preserved.
         CONCAT(
           'Found: ',
           ARRAY_TO_STRING([
-            CONCAT('[', title_match, '] in title'),
-            CONCAT('[', description_match, '] in description'),
-            CONCAT('[', tags_match, '] in tags')],
+            CONCAT('[', m.title_match, '] in title'),
+            CONCAT('[', m.description_match, '] in description'),
+            CONCAT('[', m.tags_match, '] in tags')],
           ', ')
-        ) as reason
-      FROM ${var.project_id}.${var.bq_dataset}.VideosWithMatchedKeywords
+        ) AS reason
+      FROM matched AS m
+      LEFT JOIN videos AS v ON v.video_id = m.entity_id
+      WHERE (v.availability_status IS NULL OR v.availability_status != 'DELETED')
     EOT
     use_legacy_sql = false
   }
@@ -499,19 +739,79 @@ resource "google_bigquery_table" "channels_to_exclude" {
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
-    google_bigquery_table.channels_with_matched_keywords
+    google_bigquery_table.detection,
+    google_bigquery_table.detection_policy
   ]
   view {
     query          = <<-EOT
+      WITH policies AS (
+        SELECT * FROM `${var.project_id}.${var.bq_dataset}.detection_policy`
+        WHERE enabled
+      ),
+      classified AS (
+        SELECT
+          d.entity_id AS entity_id,
+          d.modality AS modality,
+          d.label AS label,
+          ARRAY_AGG(p.action ORDER BY p.priority DESC LIMIT 1)[OFFSET(0)] AS action
+        FROM `${var.project_id}.${var.bq_dataset}.detection` AS d
+        JOIN policies AS p
+          ON (p.entity_type IS NULL OR p.entity_type = d.entity_type)
+          AND (p.source IS NULL OR p.source = d.source)
+          AND (p.detector IS NULL OR p.detector = d.detector)
+          AND (p.taxonomy_prefix IS NULL OR STARTS_WITH(d.taxonomy, p.taxonomy_prefix))
+          AND (p.min_score IS NULL OR d.score >= p.min_score)
+        WHERE d.entity_type = 'channel'
+          AND d.retracted_at IS NULL
+        GROUP BY d.entity_id, d.modality, d.label
+      ),
+      matched AS (
+        SELECT
+          entity_id,
+          STRING_AGG(DISTINCT IF(modality = 'title', label, NULL), ', ') AS title_match,
+          STRING_AGG(DISTINCT IF(modality = 'description', label, NULL), ', ') AS description_match
+        FROM classified
+        WHERE action = 'exclude'
+        GROUP BY entity_id
+      ),
+      channels AS (
+        SELECT
+          channel_id,
+          title
+        FROM `${var.project_id}.${var.bq_dataset}.youtube_channel`
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY channel_id ORDER BY datetime_updated DESC) = 1
+      )
       SELECT
-        DISTINCT channel_id, channel_url, title,
-        CONCAT('Found: [', title_match, '] in title') as reason
-      FROM ${var.project_id}.${var.bq_dataset}.ChannelsWithMatchedKeywords
+        m.entity_id AS channel_id,
+        CONCAT('https://www.youtube.com/channel/', m.entity_id) AS channel_url,
+        c.title AS title,
+        -- The column list is unchanged, and the reason text reports both title
+        -- and description matches so that channels matched via description
+        -- carry an accurate attribution reason.
+        CONCAT(
+          'Found: ',
+          ARRAY_TO_STRING([
+            CONCAT('[', m.title_match, '] in title'),
+            CONCAT('[', m.description_match, '] in description')],
+          ', ')
+        ) AS reason
+      FROM matched AS m
+      LEFT JOIN channels AS c ON c.channel_id = m.entity_id
     EOT
     use_legacy_sql = false
   }
 }
 
+
+############################### Statistics Views ###############################
+# Counts of how often each keyword fires, per modality. These read detection
+# directly rather than re-splitting the comma-joined compatibility views: the
+# detection rows are already one per keyword, so the SPLIT and UNNEST are not
+# needed, avoiding fragile string splitting on comma-joined columns.
+#
+# As with the compatibility views, no policy filter is applied: the question
+# these answer is "which keywords fire", not "which entities are excluded".
 resource "google_bigquery_table" "video_keyword_statistics" {
   project             = "${var.project_id}"
   table_id            = "VideoKeywordStatistics"
@@ -519,47 +819,22 @@ resource "google_bigquery_table" "video_keyword_statistics" {
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
-    google_bigquery_table.videos_with_matched_keywords
+    google_bigquery_table.detection
   ]
   view {
     query          = <<-EOT
-      WITH exploded_table AS (
-        SELECT
-          SPLIT(title_match, ',') AS title_words,
-          SPLIT(description_match, ',') AS description_words,
-          SPLIT(tags_match, ',') AS tags_words
-        FROM ${var.project_id}.${var.bq_dataset}.VideosWithMatchedKeywords
-      ),
-      title_keywords as (
-        SELECT trim(words) as keyword FROM
-        exploded_table,
-        UNNEST(title_words) as words
-      ),
-      description_keywords as (
-        SELECT trim(words) as keyword FROM
-        exploded_table,
-        UNNEST(description_words) as words
-      ),
-      tags_keywords as (
-        SELECT trim(words) as keyword FROM
-        exploded_table,
-        UNNEST(tags_words) as words
-      )
       SELECT
-        keyword,
+        label AS keyword,
         COUNT(*) AS total_matched_keywords,
-        SUM(CASE WHEN table = 'title_keywords' THEN 1 ELSE 0 END) AS title_matched_keywords,
-        SUM(CASE WHEN table = 'description_keywords' THEN 1 ELSE 0 END) AS description_matched_keywords,
-        SUM(CASE WHEN table = 'tags_keywords' THEN 1 ELSE 0 END) AS tags_matched_keywords
-      FROM (
-        SELECT keyword, 'title_keywords' AS table FROM title_keywords
-        UNION ALL
-        SELECT keyword, 'description_keywords' AS table FROM description_keywords
-        UNION ALL
-        SELECT keyword, 'tags_keywords' AS table FROM tags_keywords
-      ) AS all_keywords
+        COUNTIF(modality = 'title') AS title_matched_keywords,
+        COUNTIF(modality = 'description') AS description_matched_keywords,
+        COUNTIF(modality = 'tags') AS tags_matched_keywords
+      FROM `${var.project_id}.${var.bq_dataset}.detection`
+      WHERE entity_type = 'video'
+        AND detector = 'keyword_match'
+        AND retracted_at IS NULL
       GROUP BY keyword
-      ORDER BY 2 DESC, 3 DESC, 4 DESC, 5 DESC;
+      ORDER BY 2 DESC, 3 DESC, 4 DESC, 5 DESC
     EOT
     use_legacy_sql = false
   }
@@ -572,26 +847,23 @@ resource "google_bigquery_table" "channel_keyword_statistics" {
   deletion_protection = false
   depends_on = [
     google_bigquery_dataset.video_exclusion_toolbox,
+    google_bigquery_table.detection
   ]
   view {
     query          = <<-EOT
-      WITH exploded_table AS (
-        SELECT
-          SPLIT(title_match, ',') AS title_words
-        FROM ${var.project_id}.${var.bq_dataset}.ChannelsWithMatchedKeywords
-      ),
-      title_keywords as (
-        SELECT trim(words) as keyword FROM
-        exploded_table,
-        UNNEST(title_words) as words
-      )
       SELECT
-        keyword,
-        COUNT(*) AS title_matched_keywords
-      FROM title_keywords
-      GROUP BY 1
-      ORDER BY 2 DESC, 1;
+        label AS keyword,
+        COUNT(*) AS total_matched_keywords,
+        COUNTIF(modality = 'title') AS title_matched_keywords,
+        COUNTIF(modality = 'description') AS description_matched_keywords
+      FROM `${var.project_id}.${var.bq_dataset}.detection`
+      WHERE entity_type = 'channel'
+        AND detector = 'keyword_match'
+        AND retracted_at IS NULL
+      GROUP BY keyword
+      ORDER BY 2 DESC, 1
     EOT
     use_legacy_sql = false
   }
 }
+
