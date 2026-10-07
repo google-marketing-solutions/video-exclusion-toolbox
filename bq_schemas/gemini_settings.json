@@ -1,0 +1,14 @@
+[
+  {
+    "name": "setting",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Column A of the gemini_settings tab: the name of a setting, for example age_check_mode."
+  },
+  {
+    "name": "value",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Column B of the gemini_settings tab: the value of the setting. Read as text and validated by the Gemini video evaluator, so that a malformed value is reported in plain language instead of failing the read."
+  }
+]

@@ -103,24 +103,6 @@ resource "google_storage_bucket_object" "youtube_thumbnails_generate_cropouts" {
     resource.google_storage_bucket.source_archive
   ]
 }
-resource "google_storage_bucket_object" "youtube_thumbnails_evaluate_age_dispatcher" {
-  name   = "youtube_thumbnails_evaluate_age_dispatcher_${data.archive_file.youtube_thumbnails_evaluate_age_dispatcher.output_md5}.zip"
-  bucket = google_storage_bucket.source_archive.name
-  source = data.archive_file.youtube_thumbnails_evaluate_age_dispatcher.output_path
-  depends_on = [
-    data.archive_file.youtube_thumbnails_evaluate_age_dispatcher,
-    resource.google_storage_bucket.source_archive
-  ]
-}
-resource "google_storage_bucket_object" "youtube_thumbnails_evaluate_age_processor" {
-  name   = "youtube_thumbnails_evaluate_age_processor_${data.archive_file.youtube_thumbnails_evaluate_age_processor.output_md5}.zip"
-  bucket = google_storage_bucket.source_archive.name
-  source = data.archive_file.youtube_thumbnails_evaluate_age_processor.output_path
-  depends_on = [
-    data.archive_file.youtube_thumbnails_evaluate_age_processor,
-    resource.google_storage_bucket.source_archive
-  ]
-}
 
 resource "google_storage_bucket_object" "keyword_matcher" {
   name   = "keyword_matcher_${data.archive_file.keyword_matcher.output_md5}.zip"
@@ -128,6 +110,16 @@ resource "google_storage_bucket_object" "keyword_matcher" {
   source = data.archive_file.keyword_matcher.output_path
   depends_on = [
     data.archive_file.keyword_matcher,
+    resource.google_storage_bucket.source_archive
+  ]
+}
+
+resource "google_storage_bucket_object" "gemini_video_evaluator" {
+  name   = "gemini_video_evaluator_${data.archive_file.gemini_video_evaluator.output_md5}.zip"
+  bucket = google_storage_bucket.source_archive.name
+  source = data.archive_file.gemini_video_evaluator.output_path
+  depends_on = [
+    data.archive_file.gemini_video_evaluator,
     resource.google_storage_bucket.source_archive
   ]
 }

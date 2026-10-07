@@ -13,15 +13,9 @@
 # limitations under the License.
 
 locals {
-  scheduler_body                        = <<EOF
+  scheduler_body = <<EOF
     {
         "sheet_id": "${var.config_sheet_id}"
-    }
-    EOF
-  evaluate_thumbnail_age_scheduler_body = <<EOF
-    {
-        "sheet_id": "${var.config_sheet_id}",
-        "processing_limit": "${var.age_evaluation_processing_limit}"
     }
     EOF
   # The matcher does not take a sheet_id: it reads the keywords through the
@@ -33,6 +27,10 @@ locals {
         "ack_keyword_set_change": false
     }
     EOF
+  # The evaluator takes no parameters. Every setting comes from the Config
+  # Sheet, through the gemini_settings and gemini_categories external tables,
+  # and the function answers 400 to a body that carries any field.
+  gemini_video_evaluator_scheduler_body = "{}"
 }
 
 resource "google_cloud_scheduler_job" "gads_dispatch_accounts" {
@@ -57,33 +55,11 @@ resource "google_cloud_scheduler_job" "gads_dispatch_accounts" {
   }
 }
 
-resource "google_cloud_scheduler_job" "vet_evaluate_thumbnail_age" {
-  name             = "vet-evaluate-thumbnail-age"
-  description      = "Kicks off the thumbnail age evaluation process."
-  schedule         = "10,40 * * * *"
-  time_zone        = "Etc/UTC"
-  attempt_deadline = "320s"
-  region           = var.region
-
-  http_target {
-    http_method = "POST"
-    uri         = google_cloudfunctions2_function.youtube_thumbnails_evaluate_age_dispatcher.service_config[0].uri
-    body        = base64encode(local.evaluate_thumbnail_age_scheduler_body)
-    headers = {
-      "Content-Type" = "application/json"
-    }
-    oidc_token {
-      audience              = "${google_cloudfunctions2_function.youtube_thumbnails_evaluate_age_dispatcher.service_config[0].uri}/"
-      service_account_email = google_service_account.video_exclusion_toolbox.email
-    }
-  }
-}
-
 resource "google_cloud_scheduler_job" "vet_keyword_match" {
   name        = "vet-keyword-match"
   description = "Detects advertiser exclusion keywords in YouTube video and channel text."
-  # Twenty past the hour, clear of the account dispatch at 0 and the thumbnail
-  # age evaluation at 10 and 40, so the three do not contend for slots.
+  # Twenty past the hour, clear of the account dispatch at 0 and the Gemini
+  # video evaluator at 10 and 40, so the three do not contend for slots.
   schedule  = "20 * * * *"
   time_zone = "Etc/UTC"
   # Exceeds the function's own 300s timeout, so the function is always the one
@@ -100,6 +76,29 @@ resource "google_cloud_scheduler_job" "vet_keyword_match" {
     }
     oidc_token {
       audience              = "${google_cloudfunctions2_function.keyword_matcher.service_config[0].uri}/"
+      service_account_email = google_service_account.video_exclusion_toolbox.email
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "vet_gemini_video_evaluate" {
+  name             = "vet-gemini-video-evaluate"
+  description      = "Reconciles completed Agent Platform Batch jobs and dispatches new Multimodal Gemini video evaluations."
+  schedule         = "10,40 * * * *"
+  time_zone        = "Etc/UTC"
+  attempt_deadline = "960s"
+  region           = var.region
+  paused           = !var.enable_gemini_video_evaluation
+
+  http_target {
+    http_method = "POST"
+    uri         = google_cloudfunctions2_function.gemini_video_evaluator.service_config[0].uri
+    body        = base64encode(local.gemini_video_evaluator_scheduler_body)
+    headers = {
+      "Content-Type" = "application/json"
+    }
+    oidc_token {
+      audience              = "${google_cloudfunctions2_function.gemini_video_evaluator.service_config[0].uri}/"
       service_account_email = google_service_account.video_exclusion_toolbox.email
     }
   }

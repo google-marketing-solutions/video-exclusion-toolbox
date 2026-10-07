@@ -27,7 +27,7 @@
     "name": "taxonomy_prefix",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "Prefix-matched against detection.taxonomy, so 'advertiser_blocklist.' covers the whole subtree. NULL matches any taxonomy."
+    "description": "Matched against detection.taxonomy. A value ending in '.' covers that whole subtree, so 'advertiser_blocklist.' matches 'advertiser_blocklist.keyword'; any other value must equal the taxonomy exactly. NULL matches any taxonomy."
   },
   {
     "name": "min_score",

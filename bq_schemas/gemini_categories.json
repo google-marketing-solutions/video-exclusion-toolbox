@@ -1,0 +1,26 @@
+[
+  {
+    "name": "category",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Column A of the gemini_categories tab: the name of the category, for example kids. Lowercase letters, digits and underscores, starting with a letter."
+  },
+  {
+    "name": "mode",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Column B: Disabled, Shadow or Exclude. Blank means Disabled."
+  },
+  {
+    "name": "min_score",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Column C: the score from which a video counts as belonging to the category, 0.50 to 1.00 or 50% to 100%. Blank means 0.70. Read as text so that a malformed value is reported in plain language instead of failing the read."
+  },
+  {
+    "name": "description",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Column D: what the category means. It is given to Gemini as written."
+  }
+]

@@ -14,7 +14,7 @@
 
 ################################# Native BQ tables #############################
 resource "google_bigquery_table" "google_ads_report_video" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "google_ads_report_video"
   deletion_protection = true
@@ -27,7 +27,7 @@ resource "google_bigquery_table" "google_ads_report_video" {
 }
 
 resource "google_bigquery_table" "google_ads_report_video_legacy_alias" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "GoogleAdsReportVideo"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -44,7 +44,7 @@ resource "google_bigquery_table" "google_ads_report_video_legacy_alias" {
 }
 
 resource "google_bigquery_table" "google_ads_report_channel" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "google_ads_report_channel"
   deletion_protection = true
@@ -57,7 +57,7 @@ resource "google_bigquery_table" "google_ads_report_channel" {
 }
 
 resource "google_bigquery_table" "google_ads_report_channel_legacy_alias" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "GoogleAdsReportChannel"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -74,7 +74,7 @@ resource "google_bigquery_table" "google_ads_report_channel_legacy_alias" {
 }
 
 resource "google_bigquery_table" "google_ads_exclusions" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "GoogleAdsExclusions"
   deletion_protection = true
@@ -83,7 +83,7 @@ resource "google_bigquery_table" "google_ads_exclusions" {
 }
 
 resource "google_bigquery_table" "youtube_channel" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "youtube_channel"
   deletion_protection = true
@@ -92,7 +92,7 @@ resource "google_bigquery_table" "youtube_channel" {
 }
 
 resource "google_bigquery_table" "youtube_channel_legacy_alias" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "YouTubeChannel"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -109,7 +109,7 @@ resource "google_bigquery_table" "youtube_channel_legacy_alias" {
 }
 
 resource "google_bigquery_table" "youtube_video" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "youtube_video"
   deletion_protection = true
@@ -118,7 +118,7 @@ resource "google_bigquery_table" "youtube_video" {
 }
 
 resource "google_bigquery_table" "youtube_video_legacy_alias" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "YouTubeVideo"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -135,7 +135,7 @@ resource "google_bigquery_table" "youtube_video_legacy_alias" {
 }
 
 resource "google_bigquery_table" "youtube_thumbnails" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeThumbnailsWithAnnotations"
   deletion_protection = true
@@ -144,7 +144,7 @@ resource "google_bigquery_table" "youtube_thumbnails" {
 }
 
 resource "google_bigquery_table" "youtube_thumbnail_cropouts" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "YouTubeThumbnailCropouts"
   deletion_protection = true
@@ -162,7 +162,7 @@ resource "google_bigquery_table" "youtube_thumbnail_cropouts" {
 # splitting observation from policy. The ToExclude views below are where
 # detection_policy is consulted.
 resource "google_bigquery_table" "videos_with_matched_keywords" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "VideosWithMatchedKeywords"
   description         = "Videos with at least one exclusion keyword detected, in the legacy comma-joined shape. A view over the detection table."
@@ -216,7 +216,7 @@ resource "google_bigquery_table" "videos_with_matched_keywords" {
 }
 
 resource "google_bigquery_table" "channels_with_matched_keywords" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "ChannelsWithMatchedKeywords"
   description         = "Channels with at least one exclusion keyword detected, in the legacy comma-joined shape. A view over the detection table."
@@ -263,8 +263,11 @@ resource "google_bigquery_table" "channels_with_matched_keywords" {
   }
 }
 
+# Written by the retired Gen 1 thumbnail age evaluator. Nothing writes to it any
+# more; it is kept for its historical rows. The Gemini video evaluator records
+# its age results in detection instead.
 resource "google_bigquery_table" "youtube_thumbnail_age_evaluation" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "youtube_thumbnail_age_evaluation"
   deletion_protection = true
@@ -274,11 +277,11 @@ resource "google_bigquery_table" "youtube_thumbnail_age_evaluation" {
 
 ############################### Detection Tables ###############################
 # The observation store. One row per entity, modality and label; that tuple is
-# the MERGE key. It is written by the keyword matcher and, in time, by other
-# detectors, which is why the detector and taxonomy are columns rather than
+# the MERGE key. It is written by the keyword matcher and the Gemini video
+# evaluator, which is why the detector and taxonomy are columns rather than
 # being implied by the table name.
 resource "google_bigquery_table" "detection" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "detection"
   description         = "Detections made about YouTube entities, one row per entity, modality and label. Written by detectors; read by the policy views. Holds observations only - whether a detection leads to an exclusion is decided by detection_policy."
@@ -295,7 +298,7 @@ resource "google_bigquery_table" "detection" {
 # of a detection to change without recomputing it, and what keeps the
 # ToExclude views declarative.
 resource "google_bigquery_table" "detection_policy" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "detection_policy"
   description         = "Decides which detections become exclusions. Rows are matched against detection on the non-NULL fields; among the matches the highest enabled priority wins."
@@ -305,6 +308,10 @@ resource "google_bigquery_table" "detection_policy" {
 }
 
 locals {
+  # Seeds the keyword policy only. The Gemini policies, whose ids begin with
+  # first_party_gemini_, are written by the Gemini video evaluator from the
+  # Config Sheet on every run. That sync also switches off the two Gemini rows
+  # this seed inserted in earlier versions.
   seed_detection_policy_sql = <<-EOT
     MERGE INTO `${var.project_id}.${google_bigquery_dataset.video_exclusion_toolbox.dataset_id}.${google_bigquery_table.detection_policy.table_id}` T
     USING (
@@ -345,7 +352,7 @@ resource "google_bigquery_job" "seed_detection_policy" {
 ############################## External BQ Tables ##############################
 resource "google_bigquery_table" "youtube_category_lookup" {
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-  project             = "${var.project_id}"
+  project             = var.project_id
   deletion_protection = true
   depends_on = [
     resource.google_bigquery_dataset.video_exclusion_toolbox,
@@ -362,7 +369,7 @@ resource "google_bigquery_table" "youtube_category_lookup" {
 }
 
 resource "google_bigquery_table" "exclusion_keywords" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   table_id            = "exclusion_keywords"
   deletion_protection = true
@@ -381,8 +388,51 @@ resource "google_bigquery_table" "exclusion_keywords" {
   }
 }
 
+# The two tabs of the Config Sheet that set up the Gemini video evaluator.
+# Columns are read by position, and the first row of each tab is a header that
+# is skipped.
+resource "google_bigquery_table" "gemini_settings" {
+  project             = var.project_id
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "gemini_settings"
+  deletion_protection = true
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  external_data_configuration {
+    autodetect    = false
+    source_format = "GOOGLE_SHEETS"
+    source_uris = [
+      "https://docs.google.com/spreadsheets/d/${var.config_sheet_id}"
+    ]
+    schema = file("../bq_schemas/gemini_settings.json")
+    google_sheets_options {
+      range             = "gemini_settings!A:B"
+      skip_leading_rows = "1"
+    }
+  }
+}
+
+resource "google_bigquery_table" "gemini_categories" {
+  project             = var.project_id
+  dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+  table_id            = "gemini_categories"
+  deletion_protection = true
+  depends_on          = [google_bigquery_dataset.video_exclusion_toolbox]
+  external_data_configuration {
+    autodetect    = false
+    source_format = "GOOGLE_SHEETS"
+    source_uris = [
+      "https://docs.google.com/spreadsheets/d/${var.config_sheet_id}"
+    ]
+    schema = file("../bq_schemas/gemini_categories.json")
+    google_sheets_options {
+      range             = "gemini_categories!A:D"
+      skip_leading_rows = "1"
+    }
+  }
+}
+
 resource "google_bigquery_table" "exclusion_keywords_legacy_alias" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "ExclusionKeywords"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -400,7 +450,7 @@ resource "google_bigquery_table" "exclusion_keywords_legacy_alias" {
 
 #################################### Views #####################################
 resource "google_bigquery_table" "ads_and_youtube" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "AdsAndYouTube"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -451,7 +501,7 @@ resource "google_bigquery_table" "ads_and_youtube" {
 }
 
 resource "google_bigquery_table" "ads_and_youtube_and_channels" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "AdsAndYoutubeAndChannels"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -516,7 +566,7 @@ resource "google_bigquery_table" "ads_and_youtube_and_channels" {
 }
 
 resource "google_bigquery_table" "google_ads_report_video_aggregated" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "GoogleAdsReportVideoAggregated"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -580,7 +630,7 @@ resource "google_bigquery_table" "google_ads_report_video_aggregated" {
 }
 
 resource "google_bigquery_table" "google_ads_report_channel_aggregated" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "GoogleAdsReportChannelAggregated"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -650,8 +700,13 @@ resource "google_bigquery_table" "google_ads_report_channel_aggregated" {
 # several policies match, the highest priority decides, which is what allows a
 # narrow 'ignore' to override a broad 'exclude'. A plain WHERE action =
 # 'exclude' would have dropped that override on the floor.
+#
+# A taxonomy_prefix ending in '.' covers that whole subtree, so
+# 'advertiser_blocklist.' matches 'advertiser_blocklist.keyword'. Any other
+# value must equal the taxonomy exactly, so the policy for 'content_eval.kids'
+# does not also judge 'content_eval.kids_gaming'.
 resource "google_bigquery_table" "videos_to_exclude" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "VideosToExclude"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -680,7 +735,7 @@ resource "google_bigquery_table" "videos_to_exclude" {
           ON (p.entity_type IS NULL OR p.entity_type = d.entity_type)
           AND (p.source IS NULL OR p.source = d.source)
           AND (p.detector IS NULL OR p.detector = d.detector)
-          AND (p.taxonomy_prefix IS NULL OR STARTS_WITH(d.taxonomy, p.taxonomy_prefix))
+          AND (p.taxonomy_prefix IS NULL OR d.taxonomy = p.taxonomy_prefix OR (ENDS_WITH(p.taxonomy_prefix, '.') AND STARTS_WITH(d.taxonomy, p.taxonomy_prefix)))
           AND (p.min_score IS NULL OR d.score >= p.min_score)
         WHERE d.entity_type = 'video'
           AND d.retracted_at IS NULL
@@ -691,7 +746,9 @@ resource "google_bigquery_table" "videos_to_exclude" {
           entity_id,
           STRING_AGG(DISTINCT IF(modality = 'title', label, NULL), ', ') AS title_match,
           STRING_AGG(DISTINCT IF(modality = 'description', label, NULL), ', ') AS description_match,
-          STRING_AGG(DISTINCT IF(modality = 'tags', label, NULL), ', ') AS tags_match
+          STRING_AGG(DISTINCT IF(modality = 'tags', label, NULL), ', ') AS tags_match,
+          STRING_AGG(DISTINCT IF(modality = 'thumbnail', label, NULL), ', ') AS thumbnail_match,
+          STRING_AGG(DISTINCT IF(modality = 'thumbnail_and_metadata', label, NULL), ', ') AS thumbnail_and_metadata_match
         FROM classified
         WHERE action = 'exclude'
         GROUP BY entity_id
@@ -715,13 +772,16 @@ resource "google_bigquery_table" "videos_to_exclude" {
         v.tags AS tags,
         -- CONCAT returns NULL for a NULL match and ARRAY_TO_STRING skips
         -- NULLs, so a modality that matched nothing leaves no trace. This is
-        -- the behaviour of the original expression, preserved.
+        -- the behaviour of the original expression, preserved and extended to
+        -- the Gemini thumbnail and thumbnail_and_metadata modalities.
         CONCAT(
           'Found: ',
           ARRAY_TO_STRING([
             CONCAT('[', m.title_match, '] in title'),
             CONCAT('[', m.description_match, '] in description'),
-            CONCAT('[', m.tags_match, '] in tags')],
+            CONCAT('[', m.tags_match, '] in tags'),
+            CONCAT('[', m.thumbnail_match, '] in thumbnail'),
+            CONCAT('[', m.thumbnail_and_metadata_match, '] in thumbnail_and_metadata')],
           ', ')
         ) AS reason
       FROM matched AS m
@@ -733,7 +793,7 @@ resource "google_bigquery_table" "videos_to_exclude" {
 }
 
 resource "google_bigquery_table" "channels_to_exclude" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "ChannelsToExclude"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -759,7 +819,7 @@ resource "google_bigquery_table" "channels_to_exclude" {
           ON (p.entity_type IS NULL OR p.entity_type = d.entity_type)
           AND (p.source IS NULL OR p.source = d.source)
           AND (p.detector IS NULL OR p.detector = d.detector)
-          AND (p.taxonomy_prefix IS NULL OR STARTS_WITH(d.taxonomy, p.taxonomy_prefix))
+          AND (p.taxonomy_prefix IS NULL OR d.taxonomy = p.taxonomy_prefix OR (ENDS_WITH(p.taxonomy_prefix, '.') AND STARTS_WITH(d.taxonomy, p.taxonomy_prefix)))
           AND (p.min_score IS NULL OR d.score >= p.min_score)
         WHERE d.entity_type = 'channel'
           AND d.retracted_at IS NULL
@@ -813,7 +873,7 @@ resource "google_bigquery_table" "channels_to_exclude" {
 # As with the compatibility views, no policy filter is applied: the question
 # these answer is "which keywords fire", not "which entities are excluded".
 resource "google_bigquery_table" "video_keyword_statistics" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "VideoKeywordStatistics"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false
@@ -841,7 +901,7 @@ resource "google_bigquery_table" "video_keyword_statistics" {
 }
 
 resource "google_bigquery_table" "channel_keyword_statistics" {
-  project             = "${var.project_id}"
+  project             = var.project_id
   table_id            = "ChannelKeywordStatistics"
   dataset_id          = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
   deletion_protection = false

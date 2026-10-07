@@ -1,0 +1,6 @@
+functions-framework==3.*
+google-auth==2.*
+google-cloud-bigquery==3.*
+google-genai>=1.0.0
+jsonschema==4.*
+requests==2.*

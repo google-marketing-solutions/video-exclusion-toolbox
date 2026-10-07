@@ -83,30 +83,6 @@ variable "enable_vision_processing" {
   default     = false
 }
 
-variable "enable_age_evaluation" {
-  type        = bool
-  description = "Switch whether to enable age evaluation on thumbnails."
-  default     = false
-}
-
-variable "age_evaluation_gemini_model" {
-  type        = string
-  description = "The Gemini model to use for age evaluation."
-  default     = "gemini-2.0-flash-001"
-}
-
-variable "age_evaluation_gemini_location" {
-  type        = string
-  description = "The location of the Gemini model to use for age evaluation."
-  default     = "europe-west1"
-}
-
-variable "age_evaluation_processing_limit" {
-  type        = number
-  description = "The number of videos to process for age evaluation in one batch."
-  default     = 1000
-}
-
 variable "keyword_min_retention_ratio" {
   type        = number
   description = "Keyword matcher circuit breaker: the minimum fraction of the previous run's detections that the shared keywords must still yield before the run is allowed to commit."
@@ -126,6 +102,35 @@ variable "keyword_min_keyword_retention_ratio" {
   validation {
     condition     = var.keyword_min_keyword_retention_ratio >= 0.0 && var.keyword_min_keyword_retention_ratio <= 1.0
     error_message = "keyword_min_keyword_retention_ratio must be between 0.0 and 1.0."
+  }
+}
+
+variable "enable_gemini_video_evaluation" {
+  type        = bool
+  description = "Switch whether to enable the Cloud Scheduler tick for the Multimodal Gemini Video & Thumbnail Evaluator."
+  default     = true
+}
+
+variable "gemini_video_evaluator_model" {
+  type        = string
+  description = "The Gemini model used by vet-gemini-video-evaluator for Agent Platform Batch Inference."
+  default     = "gemini-3.8-flash"
+}
+
+variable "gemini_video_evaluator_location" {
+  type        = string
+  description = "The Agent Platform location for vet-gemini-video-evaluator Batch Inference jobs."
+  default     = "global"
+}
+
+variable "gemini_video_evaluator_max_videos" {
+  type        = number
+  description = "Upper limit on the number of videos sent to Gemini in one Agent Platform Batch Inference job. The max_videos_per_batch setting in the Config Sheet can lower it, but not raise it."
+  default     = 10000
+
+  validation {
+    condition     = var.gemini_video_evaluator_max_videos >= 1 && floor(var.gemini_video_evaluator_max_videos) == var.gemini_video_evaluator_max_videos
+    error_message = "gemini_video_evaluator_max_videos must be a whole number of at least 1."
   }
 }
 

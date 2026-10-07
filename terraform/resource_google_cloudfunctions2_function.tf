@@ -319,97 +319,6 @@ resource "google_cloudfunctions2_function" "google_ads_exclusions_fetcher" {
   ]
 }
 
-resource "google_cloudfunctions2_function" "youtube_thumbnails_evaluate_age_dispatcher" {
-  location    = var.region
-  name        = "vet-thumbnail-age-evaluation-dispatcher"
-  description = "Dispatch videos for thumbnail age evaluation."
-
-  service_config {
-    max_instance_count               = 2
-    min_instance_count               = 1
-    available_memory                 = "1Gi"
-    timeout_seconds                  = 600
-    available_cpu                    = "1"
-    max_instance_request_concurrency = 1
-    environment_variables = {
-      GOOGLE_CLOUD_PROJECT               = var.project_id
-      VET_THUMBNAIL_AGE_EVALUATION_TOPIC = google_pubsub_topic.youtube_thumbnails_to_evaluate_age.name
-      VET_BIGQUERY_SOURCE_DATASET        = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-      VET_BIGQUERY_TARGET_DATASET        = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-      VET_BIGQUERY_SOURCE_TABLE          = google_bigquery_table.youtube_video.table_id
-      VET_BIGQUERY_TARGET_TABLE          = google_bigquery_table.youtube_thumbnail_age_evaluation.table_id
-    }
-    ingress_settings               = "ALLOW_INTERNAL_ONLY"
-    service_account_email          = google_service_account.video_exclusion_toolbox.email
-    all_traffic_on_latest_revision = true
-  }
-
-  build_config {
-    runtime     = "python312"
-    entry_point = "main"
-    source {
-      storage_source {
-        bucket = google_storage_bucket.source_archive.name
-        object = google_storage_bucket_object.youtube_thumbnails_evaluate_age_dispatcher.name
-      }
-    }
-  }
-
-  depends_on = [
-    resource.time_sleep.wait_60_seconds_after_role_assignment,
-    resource.google_storage_bucket_object.youtube_thumbnails_evaluate_age_dispatcher
-  ]
-}
-
-resource "google_cloudfunctions2_function" "youtube_thumbnails_evaluate_age_processor" {
-  location    = var.region
-  name        = "vet-thumbnail-age-evaluation-processor"
-  description = "Process videos for thumbnail age evaluation."
-
-  service_config {
-    max_instance_count               = 200
-    min_instance_count               = 0
-    available_memory                 = "1Gi"
-    timeout_seconds                  = 540
-    available_cpu                    = "1"
-    max_instance_request_concurrency = 1
-    environment_variables = {
-      GOOGLE_CLOUD_PROJECT        = var.project_id
-      VET_BIGQUERY_TARGET_DATASET = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
-      VET_BIGQUERY_TARGET_TABLE   = google_bigquery_table.youtube_thumbnail_age_evaluation.table_id
-      VET_GEMINI_LOCATION         = var.age_evaluation_gemini_location
-      VET_GEMINI_MODEL            = var.age_evaluation_gemini_model
-    }
-    ingress_settings               = "ALLOW_INTERNAL_ONLY"
-    service_account_email          = google_service_account.video_exclusion_toolbox.email
-    all_traffic_on_latest_revision = true
-  }
-
-  event_trigger {
-    trigger_region        = var.region
-    event_type            = "google.cloud.pubsub.topic.v1.messagePublished"
-    pubsub_topic          = google_pubsub_topic.youtube_thumbnails_to_evaluate_age.id
-    retry_policy          = "RETRY_POLICY_RETRY"
-    service_account_email = google_service_account.video_exclusion_toolbox.email
-  }
-
-  build_config {
-    runtime     = "python312"
-    entry_point = "main"
-    source {
-      storage_source {
-        bucket = google_storage_bucket.source_archive.name
-        object = google_storage_bucket_object.youtube_thumbnails_evaluate_age_processor.name
-      }
-    }
-  }
-
-  depends_on = [
-    resource.time_sleep.wait_60_seconds_after_role_assignment,
-    resource.google_storage_bucket_object.youtube_thumbnails_evaluate_age_processor
-  ]
-}
-
 resource "google_cloudfunctions2_function" "keyword_matcher" {
   location    = var.region
   name        = "vet-keyword-matcher"
@@ -468,5 +377,59 @@ resource "google_cloudfunctions2_function" "keyword_matcher" {
     resource.google_bigquery_table.youtube_channel,
     resource.google_bigquery_table.exclusion_keywords,
     resource.google_bigquery_table.detection
+  ]
+}
+
+resource "google_cloudfunctions2_function" "gemini_video_evaluator" {
+  location    = var.region
+  name        = "vet-gemini-video-evaluator"
+  description = "Multimodal Gemini video thumbnail and metadata evaluator."
+
+  service_config {
+    max_instance_count               = 1
+    min_instance_count               = 0
+    available_memory                 = "4Gi"
+    available_cpu                    = "2"
+    max_instance_request_concurrency = 1
+    timeout_seconds                  = 900
+    environment_variables = {
+      GOOGLE_CLOUD_PROJECT        = var.project_id
+      VET_BIGQUERY_DATASET        = google_bigquery_dataset.video_exclusion_toolbox.dataset_id
+      VET_VIDEO_CORPUS_TABLE      = google_bigquery_table.youtube_video.table_id
+      VET_DETECTION_TABLE         = google_bigquery_table.detection.table_id
+      VET_DETECTION_POLICY_TABLE  = google_bigquery_table.detection_policy.table_id
+      VET_VIDEOS_TO_EXCLUDE_VIEW  = google_bigquery_table.videos_to_exclude.table_id
+      VET_GEMINI_SETTINGS_TABLE   = google_bigquery_table.gemini_settings.table_id
+      VET_GEMINI_CATEGORIES_TABLE = google_bigquery_table.gemini_categories.table_id
+      VET_GEMINI_MODEL            = var.gemini_video_evaluator_model
+      VET_GEMINI_LOCATION         = var.gemini_video_evaluator_location
+      VET_MAX_VIDEOS_PER_BATCH    = tostring(var.gemini_video_evaluator_max_videos)
+    }
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    service_account_email          = google_service_account.video_exclusion_toolbox.email
+    all_traffic_on_latest_revision = true
+  }
+
+  build_config {
+    runtime         = "python314"
+    entry_point     = "main"
+    service_account = google_service_account.video_exclusion_toolbox.id
+    source {
+      storage_source {
+        bucket = google_storage_bucket.source_archive.name
+        object = google_storage_bucket_object.gemini_video_evaluator.name
+      }
+    }
+  }
+
+  depends_on = [
+    resource.time_sleep.wait_60_seconds_after_role_assignment,
+    resource.google_storage_bucket_object.gemini_video_evaluator,
+    resource.google_bigquery_table.youtube_video,
+    resource.google_bigquery_table.detection,
+    resource.google_bigquery_table.detection_policy,
+    resource.google_bigquery_table.videos_to_exclude,
+    resource.google_bigquery_table.gemini_settings,
+    resource.google_bigquery_table.gemini_categories
   ]
 }

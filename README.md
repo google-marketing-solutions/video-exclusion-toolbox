@@ -9,7 +9,10 @@ pulls your ads reports from your selected accounts and enhances it with Youtube
 Data. This allows you to filter your data based on additional criteria and helps
 you exclude unwanted videos/channels.
 
-For deployment steps, see the [deployment guide](docs/deployment.md).
+For deployment steps, see the [deployment guide](docs/deployment.md). For
+throughput, cost, infrastructure sizing, and image resolution benchmarks for the
+Gemini video evaluator, see the
+[Gemini Video Evaluator benchmarks](docs/gemini-video-evaluator-benchmarks.md).
 
 If your use case is to automatically exclude spam channels, please refer to the
 [Ads Placement Excluder](https://github.com/google/ads-placement-excluder)
@@ -18,7 +21,7 @@ solution, which was used as a the base structure for Video Exclusion Toolbox.
 ## Disclaimers
 __This is not an officially supported Google product.__
 
-Copyright 2023 Google LLC. This solution, including any related sample code or
+Copyright 2025 Google LLC. This solution, including any related sample code or
 data, is made available on an “as is,” “as available,” and “with all faults”
 basis, solely for illustrative purposes, and without warranty or representation
 of any kind. This solution is experimental, unsupported and provided solely for

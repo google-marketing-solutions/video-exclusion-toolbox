@@ -36,8 +36,3 @@ resource "google_pubsub_topic" "youtube_thumbnails_to_generate_cropouts" {
   name                       = "vid-excl-youtube-thumbnails-to-generate-cropouts"
   message_retention_duration = "604800s"
 }
-
-resource "google_pubsub_topic" "youtube_thumbnails_to_evaluate_age" {
-  name                       = "vet-youtube-thumbnails-to-evaluate-age"
-  message_retention_duration = "604800s"
-}

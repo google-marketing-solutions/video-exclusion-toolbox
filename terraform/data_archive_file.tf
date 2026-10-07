@@ -31,6 +31,11 @@ locals {
     for f in fileset("${path.module}/../src/keyword_matcher/utils", "*.py") :
     "keyword_matcher/utils/${f}" => file("${path.module}/../src/keyword_matcher/utils/${f}")
   }
+
+  gemini_video_evaluator_sources = {
+    for f in fileset("${path.module}/../src/gemini_video_evaluator/utils", "*.py") :
+    "gemini_video_evaluator/utils/${f}" => file("${path.module}/../src/gemini_video_evaluator/utils/${f}")
+  }
 }
 
 data "archive_file" "gads_account_dispatcher" {
@@ -172,33 +177,6 @@ data "archive_file" "youtube_thumbnails_generate_cropouts" {
   depends_on  = [resource.google_project_iam_member.storage_object_admin]
 }
 
-data "archive_file" "youtube_thumbnails_evaluate_age_dispatcher" {
-  type        = "zip"
-  output_path = ".temp/youtube_thumbnails_evaluate_age_dispatcher.zip"
-  source {
-    content  = file("../src/youtube_thumbnails_evaluate_age_dispatcher/main.py")
-    filename = "main.py"
-  }
-  source {
-    content  = file("../src/youtube_thumbnails_evaluate_age_dispatcher/requirements.txt")
-    filename = "requirements.txt"
-  }
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
-}
-data "archive_file" "youtube_thumbnails_evaluate_age_processor" {
-  type        = "zip"
-  output_path = ".temp/youtube_thumbnails_evaluate_age_processor.zip"
-  source {
-    content  = file("../src/youtube_thumbnails_evaluate_age_processor/main.py")
-    filename = "main.py"
-  }
-  source {
-    content  = file("../src/youtube_thumbnails_evaluate_age_processor/requirements.txt")
-    filename = "requirements.txt"
-  }
-  depends_on = [resource.google_project_iam_member.storage_object_admin]
-}
-
 data "archive_file" "keyword_matcher" {
   type        = "zip"
   output_path = ".temp/keyword_matcher.zip"
@@ -237,3 +215,36 @@ data "archive_file" "keyword_matcher" {
   }
   depends_on = [resource.google_project_iam_member.storage_object_admin]
 }
+
+data "archive_file" "gemini_video_evaluator" {
+  type        = "zip"
+  output_path = ".temp/gemini_video_evaluator.zip"
+  source {
+    content  = file("../src/gemini_video_evaluator/main.py")
+    filename = "main.py"
+  }
+  source {
+    content  = "${file("../src/common_requirements.txt")}\n${file("../src/gemini_video_evaluator/requirements.txt")}"
+    filename = "requirements.txt"
+  }
+  source {
+    content  = file("../src/gemini_video_evaluator/__init__.py")
+    filename = "gemini_video_evaluator/__init__.py"
+  }
+  dynamic "source" {
+    for_each = local.gemini_video_evaluator_sources
+    content {
+      filename = source.key
+      content  = source.value
+    }
+  }
+  dynamic "source" {
+    for_each = local.vet_common_sources
+    content {
+      filename = source.key
+      content  = source.value
+    }
+  }
+  depends_on = [resource.google_project_iam_member.storage_object_admin]
+}
+

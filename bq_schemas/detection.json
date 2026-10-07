@@ -15,7 +15,7 @@
     "name": "modality",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "The text the detection was made in: 'title', 'description' or 'tags'."
+    "description": "What the detection was made in: 'title', 'description' or 'tags' for keyword matches; 'thumbnail' or 'thumbnail_and_metadata' for Gemini evaluations."
   },
   {
     "name": "source",
@@ -27,37 +27,37 @@
     "name": "detector",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "The detector that produced the row. Currently always 'keyword_match'."
+    "description": "The detector that produced the row: 'keyword_match' or 'gemini_thumbnail_metadata_eval'."
   },
   {
     "name": "detector_version",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "Hand-maintained version of the detection rules, bumped whenever pattern construction changes, so rows written under different rules can be told apart after the fact."
+    "description": "Hand-maintained version of the detector's rules or prompt, bumped whenever they change, so rows written under different rules can be told apart after the fact."
   },
   {
     "name": "taxonomy",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "The classification namespace the label belongs to. Currently always 'advertiser_blocklist.keyword'. Consumers filter on this rather than on detector identity."
+    "description": "The classification namespace the label belongs to: 'advertiser_blocklist.keyword' for keyword matches; 'age_eval.minor_presence', 'content_eval.<category>' or 'audit.evaluated' for Gemini evaluations. Consumers filter on this rather than on detector identity."
   },
   {
     "name": "label",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "The matched keyword, in its normalised (trimmed, lowercased) form."
+    "description": "For keyword matches, the matched keyword in its normalised (trimmed, lowercased) form. For Gemini evaluations, the category name, 'minor_presence', or 'evaluated'."
   },
   {
     "name": "score",
     "type": "FLOAT",
     "mode": "NULLABLE",
-    "description": "Detector confidence. NULL for the keyword detector, which is deterministic."
+    "description": "Detector confidence. NULL for the keyword detector, which is deterministic. For Gemini evaluations: the category score from 0.0 to 1.0; 1.0 or 0.0 for minor_presence; always 0.0 for the audit.evaluated row."
   },
   {
     "name": "evidence",
     "type": "JSON",
     "mode": "NULLABLE",
-    "description": "Detector-specific supporting detail. Unused by the keyword detector."
+    "description": "Detector-specific supporting detail. Unused by the keyword detector. For Gemini evaluations: the model and Gemini's reasoning, plus the people seen and their estimated ages for minor_presence; on the audit.evaluated row, whether the evaluation succeeded."
   },
   {
     "name": "first_detected_at",
@@ -75,12 +75,12 @@
     "name": "expires_at",
     "type": "TIMESTAMP",
     "mode": "NULLABLE",
-    "description": "When the detection should stop being treated as current. Unused by the keyword detector."
+    "description": "When the detection should stop being treated as current. Unused by the current detectors."
   },
   {
     "name": "retracted_at",
     "type": "TIMESTAMP",
     "mode": "NULLABLE",
-    "description": "When the detection was withdrawn, e.g. because its keyword left the sheet. Rows are retracted rather than deleted so history survives."
+    "description": "When the detection was withdrawn, e.g. because its keyword left the sheet. Rows are retracted rather than deleted so history survives. The Gemini evaluator does not retract rows: a new evaluation of a video overwrites its previous one."
   }
 ]
